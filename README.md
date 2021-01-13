@@ -1,4 +1,6 @@
 # utorch
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1inbkBq9MPUn3O01JOhMj50O4iClOGazK?authuser=1)
+
 
 **utorch** is a minimal implementation of [pytorch](https://github.com/pytorch/pytorch/tree/f5b68e74d75c38d5e2044fc6b62112181080bb3f) and [autograd](https://github.com/HIPS/autograd).
 The idea was to create an **understandable** version of the deep learning framework, which means its code should be easy to follow even for someone who has no prior existence in machine learning, thus making it perfect for educators. To fulfill this requirement utorch supports the following features:
