@@ -198,7 +198,7 @@ Please keep in mind the purpose of this software is to provide *understandable* 
 @software{utorch,
   author = {Adam Dendek},
   title = {{utorch}: a minimal implementation of autograd and pytorch},
-  url = {https://github.com/adendek/utorch
+  url = {https://github.com/adendek/utorch},
   version = {0.1},
   year = {2021},
 }

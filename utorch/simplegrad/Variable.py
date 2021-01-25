@@ -1,15 +1,13 @@
 import numpy as np
 import simplegrad
 
+
 class Variable(object):
-    """
-    This class represents a node in the computational graph
-    """
-    def __init__(self, value=None, parents=None, fun=None, name=None):
+    def __init__(self, value=None, parents=None, fun=None, name=None, args=None):
         if value is not None:
             self._init_if_leaf(value)
         else:
-            self._init_as_inner_node(parents, fun)
+            self._init_as_inner_node(parents, fun, args)
         self.adj_list = []
         self.name = name
 
@@ -20,12 +18,20 @@ class Variable(object):
         self.value = value
         self.is_leaf = True
         self.fun = None
+        self.args = None
         self.parents = []
         self.grad = 0
 
-    def _init_as_inner_node(self, parents, fun):
-        self.value = fun(*list(map(lambda x: x.value, parents)))
+    def _init_as_inner_node(self, parents, fun, args=None):
+        if args is None:
+            self.value = fun(*list(map(lambda x: x.value, parents)))
+        else:
+            fun_params = list(map(lambda x: x.value, parents))
+            fun_params.append(args)
+            self.value = fun(*fun_params)
+
         self.fun = fun
+        self.args = args
         self.is_leaf = False
         self.parents = parents
         self.grad = 0
@@ -39,13 +45,13 @@ class Variable(object):
         else:
             return self.value.shape
 
-    def single_operator(self, fun):
-        return Variable(parents=[self], fun=fun)
+    def single_operator(self, fun, args=None):
+        return Variable(parents=[self], fun=fun, args=args)
 
-    def _two_variable_operator(self, other, fun):
+    def _two_variable_operator(self, other, fun, args=None):
         if not isinstance(other, Variable):
             other = Variable(other)
-        return Variable(parents=[self, other], fun=fun)
+        return Variable(parents=[self, other], fun=fun, args=args)
 
     def backward(self):
         sorted_nodes = topological_sort(self)
@@ -110,6 +116,10 @@ class Variable(object):
         return self.single_operator(lambda x: np.power(x, other))
 
     @classmethod
+    def exp(cls, variable):
+        return variable.single_operator(lambda x: np.exp(x))
+
+    @classmethod
     def sin(cls, variable):
         return variable.single_operator(lambda x: np.sin(x))
 
@@ -128,7 +138,7 @@ class Variable(object):
 
     @classmethod
     def relu(cls, variable):
-        return variable.single_operator(lambda x: np.where(x > 0, x, 0))
+        return variable.single_operator(lambda x: np.where(x > Variable(0), x, 0))
 
     @classmethod
     def sigmoid(cls, variable):
@@ -139,12 +149,24 @@ class Variable(object):
         return l_var.__matmul__(r_val)
 
     @classmethod
+    def abs(cls, variable):
+        return variable.single_operator(lambda x: np.abs(x))
+
+    @classmethod
     def sum(cls, variable, axis=None):
-        return variable.single_operator(lambda x: np.sum(x, axis))
+        return variable.single_operator(lambda x, args=None: np.sum(x, args), args=axis)
 
     @classmethod
     def transpose(cls, variable):
         return variable.single_operator(lambda x: np.transpose(x))
+
+    @classmethod
+    def clip_min(cls, variable, min):
+        return variable.single_operator(lambda x, args: np.clip(x, a_min=args, a_max=None), args=min)
+
+    @classmethod
+    def sign(cls, variable):
+        return variable.single_operator(lambda x: np.sign(x))
 
 
 def backward(sorted_nodes):
@@ -152,32 +174,44 @@ def backward(sorted_nodes):
         # This is the easiest way of extracting function name, and finding associated primitive in the dictionary.
         return str(fun).split(".")[1]
 
-    def reverse_broadcasting(node,gradient):
+    def reverse_broadcasting(node, gradient):
         if len(node.shape()) < len(gradient.shape()):
+            # print("reverse broadcast", node.shape(), gradient.shape())
             gradient = Variable.sum(gradient, axis=0)
+            # print("reversed: ",gradient.shape() )
         return gradient
 
     sorted_nodes[0].grad = Variable(1)
     for node in sorted_nodes:
         if node.fun is None:
             continue
+        # print("processing node", node)
 
         primitive_function = simplegrad.primitives[get_function_name(node.fun)]
-        # right now, there are 2 options. Each node has one or two parents.
-        # no way to have more than 2, since e.g. a+b+c will be converted into two nodes (a+b) + c
+        # right now, there are 2 options. Each node has two or one parent(s).
+        # no option to have more than 2, since e.g. a+b+c will be converted into two nodes (a+b) + c
         if len(node.parents) == 2:
             # gradient with respect to one parent or with respect to another makes a fucking difference.
             # thus we need to treat them separately.
             parent_left, parent_right = node.parents
-            parent_left.grad += primitive_function[0](node.grad, parent_left, parent_right)
+            left_update = primitive_function[0](node.grad, parent_left, parent_right, node.args)
+            # print("left update", left_update)
+            parent_left.grad += left_update
             parent_left.grad = reverse_broadcasting(parent_left, parent_left.grad)
-            parent_right.grad +=  primitive_function[1](node.grad, parent_left, parent_right)
+
+            right_update = primitive_function[1](node.grad, parent_left, parent_right, node.args)
+            # print("right_update update", right_update)
+            parent_right.grad += right_update
             parent_right.grad = reverse_broadcasting(parent_right, parent_right.grad)
 
         else:
             parent = node.parents[0]
-            parent.grad += primitive_function(node.grad, parent)
-            parent.grad = reverse_broadcasting(parent.grad, parent.grad)
+            update = primitive_function(node.grad, parent, node.args)
+
+            # print("parent grad update", update)
+            parent.grad += update
+            parent.grad = reverse_broadcasting(parent, parent.grad)
+
 
 def topological_sort(node):
   """
