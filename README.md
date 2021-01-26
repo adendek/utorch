@@ -13,7 +13,91 @@ Features that are intentionally not supported:
 
 * GPU/TPU support. We would like to reduce the complexity of the code, providing python only implementation. Thus, we don't want to contaminate the code by adding c++ classes. However, if you have an idea on how to add this feature without changing the philosophy of this library please let us know. 
 
+## nets
 
+Nets package is a collections of tools based on **simplegrad** that allows to build and train neural networks. 
+
+### Example 1: sklearn.datasets.make_classification 
+
+The first example is dedicated to solve a random n-class classification problem using a sklearn dummy dataset, 
+ see [example 1](examples/classification_sklearn_blob.py).
+ 
+ In order to train the model you have to create the following components: 
+ * Dataset. This can be done by creating an instance of [Dataset](utorch/nets/utils.py) 
+
+ ```python 
+ def build_dataset(config):
+    train_x, train_y = datasets.make_classification(n_features=config["n_features"],
+                                                    n_samples=config["n_samples"],
+                                                    n_redundant=0,
+                                                    n_classes=config["n_classes"])
+    train_y = train_y.astype(int)
+    return DataLoader(train_x, train_y, config["batch_size"])
+
+ ``` 
+ 
+ * Model. An instance of class that inherits from [Model](utorch/nets/Model.py). To make your life easier **utorch** provide a number of layers that you can use, see [Model](utorch/nets/Layers.py)
+In this example, we will build a fully connected neural network model that contains of 2 hidden layers
+
+```python
+class FullyConnected2NN(Model):
+    def __init__(self, param_dict):
+        self.layers = StackedLayers([
+            LinearLayer(n_input=param_dict["n_input"], n_hidden=param_dict["n_hidden_1"], has_bias=param_dict["bias"],
+                        name="input_layer"),
+            ReLULayer(),
+            LinearLayer(n_input=param_dict["n_hidden_1"], n_hidden=param_dict["n_hidden_2"],
+                        has_bias=param_dict["bias"], name="hidden_layer_1"),
+            ReLULayer(),
+            LinearLayer(n_input=param_dict["n_hidden_2"], n_hidden=param_dict["n_class"], has_bias=False,
+                        name="hidden_layer_2"),
+        ]
+        )
+
+    def forward(self, x, *args, **kwargs):
+        return self.layers(x)
+```
+
+* loss. This entity is created to calculate the classification loss. You can use one of the losses that was prepared by us, see [losses](utorch/nets/Losses.py)
+For the purpose of this exercises we will use **CrossEntropyWithLogitsLoss**
+
+* optimizer. You need to create an instance of Optimizer to train the model ;), see all avialable options in [optim](utorch/nets/Optmizers.py)
+
+* train loop. This utility allows you to combine previously mentioned components into fully functional DL pipeline. 
+```python
+def train_model(model, criterion, optimizer, run_hist, data_loader, num_epochs=10):
+    for epoch in range(num_epochs):
+        for iteration, batch in enumerate(data_loader):
+            inputs, labels = batch
+            outputs = model(inputs)
+            loss = criterion(outputs,  labels)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.update_model()
+
+            run_hist["loss"].append(loss.value)
+
+            print("epoch {},  it  {}, loss {} ".format(epoch, iteration, loss.value))
+
+```
+ 
+ You can monitor training progress by visualizing learning curve:
+ 
+ ![](docs/figs/Loss.png)
+ 
+ and finally, we can calculate classification accuracy
+ 
+ ```python
+def accuracy(prediction, target):
+  values = np.argmax(prediction.value,axis=1)
+  correct = np.sum(np.where(values == target, 1, 0))
+  return correct/values.shape[0]
+  
+pred =  model(Variable(train_x))
+accuracy(pred, target)
+# out: ->  0.907140625
+```
+ 
 ## simplegrad
 
 simplegrad is a tool that allows to generate computational graphs and automatically differentiate native Python and Numpy code. It can handle a large subset of Python's features, including loops, ifs, and recursion. In the future, it will take derivatives of derivatives of derivatives. It supports reverse-mode differentiation (a.k.a. backpropagation), which means it can efficiently take gradients of scalar-valued functions with respect to array-valued arguments. 
