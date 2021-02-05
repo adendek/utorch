@@ -1,4 +1,4 @@
-from simplegrad import Variable
+from utorch.simplegrad import Variable
 import numpy as np
 
 

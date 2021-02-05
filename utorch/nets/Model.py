@@ -1,4 +1,4 @@
-from simplegrad import *
+from utorch.simplegrad import *
 
 from abc import abstractmethod
 from collections.abc import Iterable
@@ -7,7 +7,7 @@ from functools import reduce
 
 class NetworkParameter(Variable):
   """
-  This class represent a network parameter and it is a Variable types. All the netwotks parameters should be initialized using this wrapper.
+  This class represent a network parameter and it is a Variable type. All the networks parameters should be initialized using this wrapper.
   It is used to provide the list of model's parameters to the optimizer.
   """
   pass
@@ -29,7 +29,7 @@ class Model(object):
     pass
 
   def __call__(self, x, *args, **kwargs):
-    """ This method calls self.forward. it is implemented int mimic the interface of pytorch """
+    """ This method calls self.forward. it is implemented to mimic the interface of pytorch """
     return self.forward(x, *args, **kwargs)
 
   def get_parameters(self):

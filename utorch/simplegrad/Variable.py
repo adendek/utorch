@@ -1,5 +1,5 @@
 import numpy as np
-import simplegrad
+import utorch.simplegrad as simplegrad
 
 
 class Variable(object):

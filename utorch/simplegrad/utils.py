@@ -1,7 +1,7 @@
 from graphviz import Digraph
 import numpy as np
 import matplotlib.pyplot as plt
-import simplegrad
+import utorch.simplegrad
 
 def draw_graph(node):
   """
