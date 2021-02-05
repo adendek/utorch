@@ -42,8 +42,10 @@ def train_model(model, criterion, optimizer, run_hist, data_loader, num_epochs=1
             optimizer.update_model()
 
             run_hist["loss"].append(loss.value)
-
-            print("epoch {},  it  {}, loss {} ".format(epoch, iteration, loss.value))
+            if iteration % 100 == 0:
+                print("epoch {}/{},  it  {}/{}, loss {} ".format(epoch, num_epochs,
+                                                             iteration, len(data_loader),
+                                                             loss.value))
 
 
 if __name__ == "__main__":
