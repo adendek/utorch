@@ -33,3 +33,24 @@ class SGD(Optimizer):
         for parameter in self.model_params:
             parameter.value -= self.learning_rate * parameter.grad.value
 
+class momentumSGD(Optimizer): #TODO: WIP, make tests
+    """
+    SGD with momentum
+    http://www.cs.toronto.edu/%7Ehinton/absps/momentum.pdf
+    The implementation of SGD with Momentum/Nesterov subtly differs from
+        Sutskever et. al. and is following the PyTorch implementation
+    https://github.com/pytorch/pytorch/blob/master/torch/optim/sgd.py
+    """
+    def __init__(self, model, learning_rate=1e-3, momentum=0.9):
+        self.model_params = model.get_parameters()
+        self.learning_rate = learning_rate
+        if momentum < 0.0:
+            raise ValueError("Invalid momentum value: {}".format(momentum))
+        self.momentum=momentum
+
+    def update_model(self):
+        velocity=0
+        for parameter in self.model_params:
+            velocity *= self.momentum
+            velocity += self.learning_rate * parameter.grad.value
+            parameter.value -= self.learning_rate * velocity
