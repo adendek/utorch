@@ -16,6 +16,7 @@ __all__ = (
     "SGD",
     "SGDm",
     "RMSProp",
+    "Adam",
     "CrossEntropyWithLogitsLoss",
     "DataLoader"
     )

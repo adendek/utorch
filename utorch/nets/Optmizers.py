@@ -74,3 +74,24 @@ class RMSProp(Optimizer): #TODO: WIP, make tests
             parameter.mean_square = parameter.mean_square.__pow__(1/2)
 
             parameter.value -= (self.lr * parameter.grad.value).__truediv__(parameter.mean_square.value)
+
+
+class Adam(Optimizer):  # TODO: WIP, make tests
+    def __init__(self, model, learning_rate=1e-3, momentum=0.9, decay=0.9, eps=1e-8):
+        self.model_params = model.get_parameters()
+        self.lr, self.b1, self.b2, self.eps, self.t = learning_rate, momentum, decay, eps, 0
+
+    def update_model(self):
+        self.t = self.t + 1
+        a = self.lr * ((1.0 - self.b2 ** self.t) ** 0.5) / (1.0 - self.b1 ** self.t)
+        for parameter in self.model_params:
+            parameter.velocity.value *= self.b1
+            parameter.velocity.value +=  (1.0 - self.b1) * parameter.grad.value
+
+            parameter.mean_square.value *= self.b2
+            parameter.mean_square += (1.0 - self.b2) * parameter.grad.value * parameter.grad.value
+            parameter.mean_square += self.eps
+            parameter.mean_square = parameter.mean_square.__pow__(1/2)
+
+            parameter.value -= a * parameter.velocity.value.__truediv__(parameter.mean_square.value)
+
