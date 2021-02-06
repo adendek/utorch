@@ -14,6 +14,7 @@ __all__ = (
    "StackedLayers",
     "Optimizer",
     "SGD",
+    "SGDm",
     "CrossEntropyWithLogitsLoss",
     "DataLoader"
     )

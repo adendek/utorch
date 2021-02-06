@@ -1,4 +1,4 @@
-from utorch.simplegrad import  Variable
+from utorch.simplegrad import Variable
 
 
 class Optimizer(object):
@@ -22,6 +22,7 @@ class Optimizer(object):
 
         for param in self.model_params:
             param.grad = Variable(0)
+            param.velocity=Variable(0)
 
 
 class SGD(Optimizer):
@@ -33,7 +34,8 @@ class SGD(Optimizer):
         for parameter in self.model_params:
             parameter.value -= self.learning_rate * parameter.grad.value
 
-class momentumSGD(Optimizer): #TODO: WIP, make tests
+
+class SGDm(Optimizer): #TODO: WIP, make tests
     """
     SGD with momentum
     http://www.cs.toronto.edu/%7Ehinton/absps/momentum.pdf
@@ -49,8 +51,7 @@ class momentumSGD(Optimizer): #TODO: WIP, make tests
         self.momentum=momentum
 
     def update_model(self):
-        velocity=0
         for parameter in self.model_params:
-            velocity *= self.momentum
-            velocity += self.learning_rate * parameter.grad.value
-            parameter.value -= self.learning_rate * velocity
+            parameter.velocity *= self.momentum
+            parameter.velocity += self.learning_rate * parameter.grad.value
+            parameter.value -= self.learning_rate * parameter.velocity.value
