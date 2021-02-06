@@ -15,6 +15,7 @@ __all__ = (
     "Optimizer",
     "SGD",
     "SGDm",
+    "RMSProp",
     "CrossEntropyWithLogitsLoss",
     "DataLoader"
     )

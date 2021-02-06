@@ -23,6 +23,7 @@ class Optimizer(object):
         for param in self.model_params:
             param.grad = Variable(0)
             param.velocity=Variable(0)
+            param.mean_square=Variable(0)
 
 
 class SGD(Optimizer):
@@ -55,3 +56,21 @@ class SGDm(Optimizer): #TODO: WIP, make tests
             parameter.velocity *= self.momentum
             parameter.velocity += self.learning_rate * parameter.grad.value
             parameter.value -= self.learning_rate * parameter.velocity.value
+
+
+class RMSProp(Optimizer): #TODO: WIP, make tests
+    """Implements RMSprop algorithm.
+        Proposed by G. Hinton in his course <https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf>
+    """
+    def __init__(self, model, learning_rate=1e-3, decay=0.9, eps=1e-8):
+        self.model_params = model.get_parameters()
+        self.lr, self.decay, self.eps = learning_rate, decay, eps
+
+    def update_model(self):
+        for i, parameter in enumerate(self.model_params):
+            parameter.mean_square.value *= self.decay
+            parameter.mean_square += (1.0 - self.decay) * parameter.grad.value * parameter.grad.value
+            parameter.mean_square += self.eps
+            parameter.mean_square = parameter.mean_square.__pow__(1/2)
+
+            parameter.value -= (self.lr * parameter.grad.value).__truediv__(parameter.mean_square.value)
