@@ -1,5 +1,5 @@
 import numpy as np
-import simplegrad
+import utorch.simplegrad as simplegrad
 
 
 class Variable(object):
@@ -143,6 +143,10 @@ class Variable(object):
     @classmethod
     def sigmoid(cls, variable):
         return variable.single_operator(lambda x: 1 / (1 + np.exp((-1) * x)))
+
+    @classmethod
+    def tanh(cls, variable):
+        return variable.single_operator(lambda x: 2 * (Variable.sigmoid(2*x)) - 1 )
 
     @classmethod
     def dot(clas, l_var, r_val):

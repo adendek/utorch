@@ -1,5 +1,5 @@
-from simplegrad import Variable
-from nets import *
+from utorch.simplegrad import Variable
+from utorch.nets import *
 import numpy as np
 
 

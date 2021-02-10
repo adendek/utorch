@@ -1,5 +1,5 @@
 import numpy as np
-from simplegrad import Variable
+from utorch.simplegrad import Variable
 
 
 def sum_backward(grad, x, axis):
