@@ -1,13 +1,14 @@
-from utorch.simplegrad import Variable
-from utorch.nets import *
 import numpy as np
+
+import utorch.simplegrad as sg
+from utorch.nets.Model import Model, NetworkParameter
 
 
 class LinearLayer(Model):
     def __init__(self, n_input, n_hidden, has_bias=False,name=None):
         layer_name = "_".join([name, "weights"])
         # I can move the layer initialization into the different method, right now it is what it is.
-        self.weights = NetworkParameter(np.random.normal(0,1, size=(n_hidden, n_input)),name=name)
+        self.weights = NetworkParameter(np.random.normal(0,1, size=(n_hidden, n_input)),name=layer_name)
         self.has_bias = has_bias
         if has_bias:
             layer_name = "_".join([name, "bias"])
@@ -15,15 +16,15 @@ class LinearLayer(Model):
 
     def forward(self, x, *args, **kwargs):
         if self.has_bias:
-            output = x@Variable.transpose(self.weights) + self.bias
+            output = x@sg.Variable.transpose(self.weights) + self.bias
         else:
-            output = x@Variable.transpose(self.weights)
+            output = x@sg.Variable.transpose(self.weights)
         return output
 
 
 class ReLULayer(Model):
     def __init__(self):
-        self.relu = Variable.relu
+        self.relu = sg.Variable.relu
 
     def forward(self, x, *args, **kwargs):
         return self.relu(x)

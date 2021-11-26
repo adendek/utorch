@@ -1,7 +1,7 @@
 from graphviz import Digraph
 import numpy as np
 import matplotlib.pyplot as plt
-import utorch.simplegrad
+import utorch.simplegrad.Variable
 
 def draw_graph(node):
   """
@@ -38,7 +38,7 @@ def draw_graph(node):
 def plot_function_and_der(fun, range=[0,1], n_points=100):
 
   def evaluate_derivative(x, fun):
-    x_var = simplegrad.Variable(x)
+    x_var = Variable.Variable(x)
     y = fun(x_var)
     y.backward()
     return y.value, x_var.grad.value

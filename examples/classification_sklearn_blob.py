@@ -1,4 +1,4 @@
-from utorch.nets import *
+import utorch.nets as nets
 from sklearn import datasets
 
 
@@ -8,19 +8,19 @@ def build_dataset(config):
                                                     n_redundant=0,
                                                     n_classes=config["n_classes"])
     train_y = train_y.astype(int)
-    return DataLoader(train_x, train_y, config["batch_size"])
+    return nets.DataLoader(train_x, train_y, config["batch_size"])
 
 
-class FullyConnected2NN(Model):
+class FullyConnected2NN(nets.Model):
     def __init__(self, param_dict):
-        self.layers = StackedLayers([
-            LinearLayer(n_input=param_dict["n_input"], n_hidden=param_dict["n_hidden_1"], has_bias=param_dict["bias"],
+        self.layers = nets.StackedLayers([
+            nets.LinearLayer(n_input=param_dict["n_input"], n_hidden=param_dict["n_hidden_1"], has_bias=param_dict["bias"],
                         name="input_layer"),
-            ReLULayer(),
-            LinearLayer(n_input=param_dict["n_hidden_1"], n_hidden=param_dict["n_hidden_2"],
+            nets.ReLULayer(),
+            nets.LinearLayer(n_input=param_dict["n_hidden_1"], n_hidden=param_dict["n_hidden_2"],
                         has_bias=param_dict["bias"], name="hidden_layer_1"),
-            ReLULayer(),
-            LinearLayer(n_input=param_dict["n_hidden_2"], n_hidden=param_dict["n_class"], has_bias=False,
+            nets.ReLULayer(),
+            nets.LinearLayer(n_input=param_dict["n_hidden_2"], n_hidden=param_dict["n_class"], has_bias=False,
                         name="hidden_layer_2"),
         ]
         )
@@ -65,8 +65,8 @@ if __name__ == "__main__":
         "n_class": 2
     }
     model = FullyConnected2NN(FC_2nn_params)
-    optim = SGD(model, 0.001)
-    criterion = CrossEntropyWithLogitsLoss(data_config["n_classes"])
+    optim = nets.SGD(model, 0.001)
+    criterion = nets.CrossEntropyWithLogitsLoss(data_config["n_classes"])
     run_hist = {"loss": []}
     train_model(model, criterion, optim, run_hist, dataset)
 

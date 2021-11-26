@@ -1,5 +1,6 @@
 import numpy as np
-import utorch.simplegrad as simplegrad
+import utorch
+from utorch.simplegrad.Primitives import primitives
 
 
 class Variable(object):
@@ -191,7 +192,7 @@ def backward(sorted_nodes):
             continue
         # print("processing node", node)
 
-        primitive_function = simplegrad.primitives[get_function_name(node.fun)]
+        primitive_function = primitives[get_function_name(node.fun)]
         # right now, there are 2 options. Each node has two or one parent(s).
         # no option to have more than 2, since e.g. a+b+c will be converted into two nodes (a+b) + c
         if len(node.parents) == 2:

@@ -1,11 +1,11 @@
-from utorch.simplegrad import *
+import utorch.simplegrad as sg
 
 from abc import abstractmethod
 from collections.abc import Iterable
 from functools import reduce
 
 
-class NetworkParameter(Variable):
+class NetworkParameter(sg.Variable):
   """
   This class represent a network parameter and it is a Variable type. All the networks parameters should be initialized using this wrapper.
   It is used to provide the list of model's parameters to the optimizer.

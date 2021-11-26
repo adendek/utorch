@@ -15,7 +15,7 @@ def sum_backward(grad, x, axis):
     """
     if axis is None:
         return grad*np.ones_like(x.value)
-    return Variable(np.broadcast_to(grad.value, x.shape()[::-1]).T)
+    return Variable.Variable(np.broadcast_to(grad.value, x.shape()[::-1]).T)
 
 
 primitives = {"__add__": [lambda grad, left, right, args: grad] * 2,
@@ -33,18 +33,18 @@ primitives = {"__add__": [lambda grad, left, right, args: grad] * 2,
               "__truediv__": [lambda grad, left, right, args: grad / right,
                               lambda grad, left, right, args: grad * (-1) * left / right ** 2],
               # based on https://math.stackexchange.com/a/3850121
-              "__matmul__": [lambda grad, left, right, args: grad @ Variable.transpose(right),
-                             lambda grad, left, right, args: Variable.transpose(left) @ grad
+              "__matmul__": [lambda grad, left, right, args: grad @ Variable.Variable.transpose(right),
+                             lambda grad, left, right, args: Variable.Variable.transpose(left) @ grad
                              ],
-              "sin": lambda grad, x, args: grad * Variable.cos(x),
-              "cos": lambda grad, x, args: (-1) * grad * Variable.sin(x),
+              "sin": lambda grad, x, args: grad * Variable.Variable.cos(x),
+              "cos": lambda grad, x, args: (-1) * grad * Variable.Variable.sin(x),
               "log": lambda grad, x, args: grad / x,
-              "relu": lambda grad, x, args: grad * np.where(x > Variable(0), 1, 0),
-              "sigmoid": lambda grad, x, args: grad * Variable.sigmoid(x) * (1 - Variable.sigmoid(x)),
+              "relu": lambda grad, x, args: grad * np.where(x > Variable.Variable(0), 1, 0),
+              "sigmoid": lambda grad, x, args: grad *Variable.Variable.sigmoid(x) * (1 - Variable.Variable.sigmoid(x)),
               "sum": lambda grad, x, args: sum_backward(grad, x, args),
-              "exp": lambda grad, x, args: grad * Variable.exp(x),
-              "transpose": lambda grad, x, args: Variable.transpose(grad),
+              "exp": lambda grad, x, args: grad * Variable.Variable.exp(x),
+              "transpose": lambda grad, x, args: Variable.Variable.transpose(grad),
               "clip_min": lambda grad, x, args: grad * (x >= args),
-              "abs": lambda grad, x, args: grad * Variable.sign(x),
+              "abs": lambda grad, x, args: grad * Variable.Variable.sign(x),
               "sign": lambda grad, x, args: np.zeros_like(x)
               }

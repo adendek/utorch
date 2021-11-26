@@ -1,8 +1,8 @@
 from unittest import TestCase
 import numpy as np
 from numpy.testing import assert_almost_equal
-
-import simplegrad
+import utorch
+from utorch.simplegrad.Variable import Variable
 import torch
 
 
@@ -17,7 +17,7 @@ def build_simplegrad_variables(value_list):
     """
     Build a list of simplegrad variables initialized according to the input list
     """
-    return [simplegrad.Variable(value) for value in value_list]
+    return [Variable(value) for value in value_list]
 
 class TestSimplegrad(TestCase):
     """
@@ -76,7 +76,7 @@ class TestSimplegrad(TestCase):
     def test_sin_division(self):
         input_values = [2.,3.,4.]
         a, b, d = build_simplegrad_variables(input_values)
-        c = a/(b*simplegrad.Variable.sin(d))
+        c = a/(b*Variable.sin(d))
         c.backward()
 
         A, B, D = build_torch_tensors(input_values)
@@ -91,7 +91,7 @@ class TestSimplegrad(TestCase):
     def test_sigmoid_relu(self):
         input_values = [2., 3., 4.]
         a, b, d = build_simplegrad_variables(input_values)
-        c = simplegrad.Variable.relu(a / (b * simplegrad.Variable.sigmoid(d)))
+        c = Variable.relu(a / (b *Variable.sigmoid(d)))
         c.backward()
 
         A, B, D = build_torch_tensors(input_values)
@@ -110,7 +110,7 @@ class TestSimplegrad(TestCase):
                         np.random.normal(1, 10, size=10)
                         ]
         d, w, b = build_simplegrad_variables(input_values)
-        c = simplegrad.Variable.sum(d@simplegrad.Variable.transpose(w)*b)
+        c = Variable.sum(d@Variable.transpose(w)*b)
         c.backward()
 
         D, W, B = build_torch_tensors(input_values)
@@ -128,10 +128,10 @@ class TestSimplegrad(TestCase):
         input_values = [np.random.randint(1,10, size=(5,3)),
                         np.random.randint(1,10, size=(5,3))]
         a,b = build_simplegrad_variables(input_values)
-        c = simplegrad.Variable.sum(
-                        simplegrad.Variable.sin(
-                            simplegrad.Variable.sum(
-                                simplegrad.Variable.sin(a+b),1
+        c = Variable.sum(
+                        Variable.sin(
+                            Variable.sum(
+                                Variable.sin(a+b),1
                             )
                         )
         )
@@ -141,7 +141,7 @@ class TestSimplegrad(TestCase):
         C = torch.sum(
                 torch.sin(
                     torch.sum(
-                        torch.sin(A+B),1)
+                        torch.sin(A+B), 1)
                 )
             )
         C.backward()
@@ -160,10 +160,10 @@ class TestSimplegrad(TestCase):
               :return: Scalar value (sum)
             """
 
-            max_val = simplegrad.Variable.clip_min(x * (-1), 0)
-            loss = (1 - target) * x + max_val + simplegrad.Variable.log(
-                simplegrad.Variable.exp(max_val * (-1)) + simplegrad.Variable.exp((x + max_val) * (-1)))
-            return simplegrad.Variable.sum(loss)
+            max_val = Variable.clip_min(x * (-1), 0)
+            loss = (1 - target) * x + max_val + Variable.log(
+                Variable.exp(max_val * (-1)) + Variable.exp((x + max_val) * (-1)))
+            return Variable.sum(loss)
 
         np.random.seed(10)
         target_values = np.random.randint(0, 3, size=10)
@@ -177,7 +177,7 @@ class TestSimplegrad(TestCase):
         d, t, w1, b1, w2, b2 = build_simplegrad_variables(input_values)
 
         c = bce_with_logits(
-            simplegrad.Variable.relu(d @ simplegrad.Variable.transpose(w1) + b1) @ simplegrad.Variable.transpose(w2) + b2,
+            Variable.relu(d @ Variable.transpose(w1) + b1) @ Variable.transpose(w2) + b2,
             t)
 
         c.backward()
