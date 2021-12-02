@@ -43,8 +43,9 @@ primitives = {"__add__": [lambda grad, left, right, args: grad] * 2,
               "sigmoid": lambda grad, x, args: grad *Variable.Variable.sigmoid(x) * (1 - Variable.Variable.sigmoid(x)),
               "sum": lambda grad, x, args: sum_backward(grad, x, args),
               "exp": lambda grad, x, args: grad * Variable.Variable.exp(x),
-              "transpose": lambda grad, x, args: Variable.Variable.transpose(grad),
+              "transpose": lambda grad, x, args: Variable.Variable.transpose(grad, args),
               "clip_min": lambda grad, x, args: grad * (x >= args),
               "abs": lambda grad, x, args: grad * Variable.Variable.sign(x),
-              "sign": lambda grad, x, args: np.zeros_like(x)
+              "sign": lambda grad, x, args: np.zeros_like(x),
+              "tanh": lambda grad, x, args: grad/Variable.Variable.cosh(x)**2
               }

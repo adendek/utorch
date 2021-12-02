@@ -147,7 +147,11 @@ class Variable(object):
 
     @classmethod
     def tanh(cls, variable):
-        return variable.single_operator(lambda x: 2 * (Variable.sigmoid(2*x)) - 1 )
+        return variable.single_operator(lambda x: np.tanh(x))
+
+    @classmethod
+    def cosh(cls, variable):
+        return variable.single_operator(lambda x: np.cosh(x))
 
     @classmethod
     def dot(clas, l_var, r_val):
@@ -162,8 +166,8 @@ class Variable(object):
         return variable.single_operator(lambda x, args=None: np.sum(x, args), args=axis)
 
     @classmethod
-    def transpose(cls, variable):
-        return variable.single_operator(lambda x: np.transpose(x))
+    def transpose(cls, variable, args=None):
+        return variable.single_operator(lambda x: np.transpose(x, args), args=args)
 
     @classmethod
     def clip_min(cls, variable, min):
