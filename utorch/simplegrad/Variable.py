@@ -2,14 +2,12 @@ import numpy as np
 import utorch
 from utorch.simplegrad.Primitives import primitives
 
-
 class Variable(object):
     def __init__(self, value=None, parents=None, fun=None, name=None, args=None):
         if value is not None:
             self._init_if_leaf(value)
         else:
             self._init_as_inner_node(parents, fun, args)
-        self.adj_list = []
         self.name = name
 
     def is_leaf(self):
@@ -22,6 +20,23 @@ class Variable(object):
         self.args = None
         self.parents = []
         self.grad = 0
+        self.preserve = False
+
+    def __del__(self):
+        if not self.preserve:
+            if hasattr(self, "value"):
+                del self.value
+            if hasattr(self, "fun"):
+                del self.fun
+            if hasattr(self, "args"):
+                del self.args
+            if hasattr(self, "grad" ):
+                del self.grad
+            if hasattr(self, 'name'):
+                del self.name
+            if hasattr(self, "parents"):
+                self.parents.clear()
+                del self.parents
 
     def _init_as_inner_node(self, parents, fun, args=None):
         if args is None:
@@ -36,9 +51,7 @@ class Variable(object):
         self.is_leaf = False
         self.parents = parents
         self.grad = 0
-
-        # No idea if we need this. We will see
-        list(map(lambda parent: parent.adj_list.append(self), parents))
+        self.preserve = False
 
     def shape(self):
         if isinstance(self.value, int) or isinstance(self.value, float):
@@ -57,6 +70,8 @@ class Variable(object):
     def backward(self):
         sorted_nodes = topological_sort(self)
         backward(sorted_nodes)
+        cleanup_graph(sorted_nodes)
+
 
     def __ge__(self, other):
         if isinstance(other, Variable):
@@ -166,6 +181,11 @@ class Variable(object):
         return variable.single_operator(lambda x, args=None: np.sum(x, args), args=axis)
 
     @classmethod
+    def mean(cls, variable, axis=None):
+        return variable.single_operator(lambda x, args=None: np.mean(x, args), args=axis)
+
+
+    @classmethod
     def transpose(cls, variable, args=None):
         return variable.single_operator(lambda x: np.transpose(x, args), args=args)
 
@@ -203,6 +223,8 @@ def backward(sorted_nodes):
             # gradient with respect to one parent or with respect to another makes a fucking difference.
             # thus we need to treat them separately.
             parent_left, parent_right = node.parents
+            # clean memory
+
             left_update = primitive_function[0](node.grad, parent_left, parent_right, node.args)
             # print("left update", left_update)
             parent_left.grad += left_update
@@ -220,6 +242,22 @@ def backward(sorted_nodes):
             # print("parent grad update", update)
             parent.grad += update
             parent.grad = reverse_broadcasting(parent, parent.grad)
+
+
+def cleanup_graph(sorted_nodes):
+    """
+    This method allows to remove redundant nodes after node.backward()
+    :param sorted_nodes:
+    :return:
+    """
+
+    while sorted_nodes:
+        node = sorted_nodes.pop(-1)
+        if not node.preserve:
+            node.parents.clear()
+            del node
+
+
 
 
 def topological_sort(node):

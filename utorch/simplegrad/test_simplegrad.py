@@ -192,3 +192,44 @@ class TestSimplegrad(TestCase):
             [w1.grad, b1.grad, w2.grad, b2.grad],
             [W1.grad, B1.grad, W2.grad, B2.grad]
         )
+    def test_binary_cross_entropy_with_logits_mean(self):
+        def bce_with_logits(x, target):
+            """
+              Binary Cross Entropy Loss with mean reduction
+              Should be numerically stable, built based on: https://github.com/pytorch/pytorch/issues/751
+              :param x: Input tensor
+              :return: Scalar value (mean)
+            """
+
+            max_val = Variable.clip_min(x * (-1), 0)
+            loss = (1 - target) * x + max_val + Variable.log(
+                Variable.exp(max_val * (-1)) + Variable.exp((x + max_val) * (-1)))
+            return Variable.mean(loss)
+
+        np.random.seed(10)
+        target_values = np.random.randint(0, 3, size=10)
+        input_values = [np.random.normal(1, 1, size=(10, 10)), # data
+                        np.eye(3)[target_values], # target
+                        np.random.normal(1, 1, size=(5, 10)), #w1
+                        np.random.normal(1, 1, size=(5)),# b1
+                        np.random.normal(1, 1, size=(3, 5)),# w2
+                        np.random.normal(1, 1, size=(3)) # b2
+                        ]
+        d, t, w1, b1, w2, b2 = build_simplegrad_variables(input_values)
+
+        c = bce_with_logits(
+            Variable.relu(d @ Variable.transpose(w1) + b1) @ Variable.transpose(w2) + b2,
+            t)
+
+        c.backward()
+
+        D, T, W1, B1, W2, B2 = build_torch_tensors(input_values)
+
+        C = torch.nn.BCEWithLogitsLoss(reduction="mean")(
+            torch.relu(D @ W1.T + B1) @ W2.T + B2,
+            T)
+        C.backward()
+        self.vallidate_vs_pytorch(
+            [w1.grad, b1.grad, w2.grad, b2.grad],
+            [W1.grad, B1.grad, W2.grad, B2.grad]
+        )

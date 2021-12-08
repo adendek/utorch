@@ -21,10 +21,22 @@ class Optimizer(object):
             )
 
         for param in self.model_params:
+            self._zero_grad(param)
+            if hasattr(param, "velocity"):
+                del param.velocity
+            if hasattr(param, "mean_square"):
+                del param.mean_square
             param.grad = Variable(0)
             param.velocity=Variable(0)
             param.mean_square=Variable(0)
 
+    def _zero_grad(self, param_grad):
+        grad_parents = param_grad.parents
+        while grad_parents:
+            parent =  grad_parents.pop()
+            self._zero_grad(parent)
+            del parent
+        del param_grad
 
 class SGD(Optimizer):
     def __init__(self, model, learning_rate):

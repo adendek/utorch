@@ -1,6 +1,6 @@
 import numpy as np
 from utorch.simplegrad import Variable
-
+from functools import reduce
 
 def sum_backward(grad, x, axis):
     """
@@ -16,6 +16,20 @@ def sum_backward(grad, x, axis):
     if axis is None:
         return grad*np.ones_like(x.value)
     return Variable.Variable(np.broadcast_to(grad.value, x.shape()[::-1]).T)
+
+
+def mean_backward(grad, x, axis):
+    """
+    This function implement backward of a mean.
+    Currently axis parameter is not supported.
+    """
+    def find_normalization_factor(shape):
+        return reduce(lambda x,y: x*y, shape)
+
+    if axis is not None:
+        raise NotImplementedError
+    return grad.value/find_normalization_factor(x.shape())* Variable.Variable(np.ones_like(x))
+
 
 
 primitives = {"__add__": [lambda grad, left, right, args: grad] * 2,
@@ -42,6 +56,7 @@ primitives = {"__add__": [lambda grad, left, right, args: grad] * 2,
               "relu": lambda grad, x, args: grad * np.where(x > Variable.Variable(0), 1, 0),
               "sigmoid": lambda grad, x, args: grad *Variable.Variable.sigmoid(x) * (1 - Variable.Variable.sigmoid(x)),
               "sum": lambda grad, x, args: sum_backward(grad, x, args),
+              "mean": lambda grad, x, args: mean_backward(grad, x, args),
               "exp": lambda grad, x, args: grad * Variable.Variable.exp(x),
               "transpose": lambda grad, x, args: Variable.Variable.transpose(grad, args),
               "clip_min": lambda grad, x, args: grad * (x >= args),

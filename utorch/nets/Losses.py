@@ -11,9 +11,10 @@ class CrossEntropyWithLogitsLoss(Model):
     see https://github.com/pytorch/pytorch/issues/751
     """
 
-    def __init__(self, n_classes=2):
+    def __init__(self, n_classes=2, reduce=sg.Variable.sum):
         self.epsilon = sg.Variable(1e-5)
         self.n_classes = n_classes
+        self.reduce = reduce
 
     def _to_one_hot(self, target):
         return sg.Variable(np.eye(self.n_classes)[target.value])
@@ -23,7 +24,7 @@ class CrossEntropyWithLogitsLoss(Model):
         max_val = sg.Variable.clip_min(x * (-1), 0)
         loss = (1 - target) * x + max_val + sg.Variable.log(
             sg.Variable.exp(max_val * (-1)) + sg.Variable.exp((x + max_val) * (-1)))
-        return sg.Variable.sum(loss)
+        return self.reduce(loss)
 
 
 class L2Loss(Model):

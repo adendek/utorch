@@ -10,7 +10,9 @@ class NetworkParameter(sg.Variable):
   This class represent a network parameter and it is a Variable type. All the networks parameters should be initialized using this wrapper.
   It is used to provide the list of model's parameters to the optimizer.
   """
-  pass
+  def __init__(self, value=None, parents=None, fun=None, name=None, args=None):
+    super(NetworkParameter, self).__init__(value, parents, fun, name, args)
+    self.preserve = True
 
 
 class Model(object):
