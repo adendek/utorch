@@ -1,42 +1,72 @@
-site_name: uv template
-repo_url: https://github.com/python-boilerplate/uv-template
-repo_name: python-boilerplate/uv-template
-
-nav:
-  - Home: index.md
-
+site_name: utorch
+site_description: A minimalist educational deep learning library and autograd engine built from scratch.
+repo_url: https://github.com/adendek/utorch
+repo_name: adendek/utorch
 
 theme:
   name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.png
   features:
-    - navigation.footer
+    - navigation.instant
+    - navigation.tracking
     - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
     - content.code.copy
     - content.code.select
+    - content.tabs.link
 
   palette:
-  - media: "(prefers-color-scheme)"
-    toggle:
-      icon: material/brightness-auto
-      name: Switch to light mode
-  - media: "(prefers-color-scheme: light)"
-    scheme: default
-    primary: teal
-    accent: purple
-    toggle:
-      icon: material/weather-sunny
-      name: Switch to dark mode
-  - media: "(prefers-color-scheme: dark)"
-    scheme: slate
-    primary: black
-    accent: lime
-    toggle:
-      icon: material/weather-night
-      name: Switch to system preference
+    # Light mode (PyTorch signature orange & clean paper theme)
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
 
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Lecture Roadmap: roadmap.md
+  - API Reference:
+      - Overview: api/index.md
+      - autograd: api/autograd.md
+      - nn: api/nn.md
+      - utils: api/utils.md
 
 plugins:
   - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_source: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            merge_init_into_class: true
+            separate_signature: true
+            line_length: 88
 
 markdown_extensions:
   - admonition
@@ -50,3 +80,9 @@ markdown_extensions:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
+  # Math formula rendering (KaTeX / MathJax)
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js

@@ -1,111 +1,164 @@
-<h1 align="center"> python-boilerplate/uv-template </h1>
-
-<p align="center">
-A comprehensive template for quickly starting new Python projects with modern development tools and best practices.
-</p>
-
 <div align="center">
 
-![Python Boilerplate](https://img.shields.io/badge/python-3.10+-blue.svg)
-![uv](https://img.shields.io/badge/uv-0.7.13-purple.svg)
-![Docker](https://img.shields.io/badge/docker-enabled-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-[![GitHub Actions Status](https://github.com/monok8i/python-boilerplate/actions/workflows/code-quality.yml/badge.svg)](https://github.com/monok8i/python-boilerplate/actions/workflows/code-quality.yml)
-[![GitHub Actions Status](https://github.com/monok8i/python-boilerplate/actions/workflows/codeql.yml/badge.svg)](https://github.com/monok8i/python-boilerplate/actions/workflows/codeql.yml)
+# utorch
+
+<img src="docs/assets/logo.png" width="200" alt="utorch logo" />
+
+**A Minimalist Deep Learning Engine & Autograd Implemented from Scratch**
+
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![uv](https://img.shields.io/badge/package%20manager-uv-8A2BE2.svg)](https://docs.astral.sh/uv/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 </div>
 
 
-## 🚀 Features
+---
 
-- **Python 3.10+**
-- **[uv](https://docs.astral.sh/uv/)** — Ultra-fast Python package installer and dependency resolver
-- **[Docker Support](https://docs.docker.com/)** — Multi-stage Dockerfiles for both local development and clean production containers
-- **[GitHub Actions CI/CD](https://docs.github.com/en/actions)** — Automated pipelines for code quality checks, testing, security scanning, and Python compatibility validation
-- **[Dev Containers](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-a-dev-container-configuration/introduction-to-dev-containers)** — Pre-configured development environment for codespaces or remote development
-- **[Code Quality Tools](https://docs.astral.sh/ruff/)** — Integrated linting and formatting with [Ruff](https://docs.astral.sh/ruff/), static type checking with [MyPy](https://mypy.readthedocs.io/en/stable/), comprehensive testing with [Pytest](https://docs.pytest.org/en/stable/) and checking minimal Python version to run your code (without dependencies) with [Vermin](https://github.com/netromdk/vermin)
-- **[Pre-commit Hooks](https://pre-commit.com/)** — Automated code quality enforcement (linting, formatting, and tests before every commit)
-- **[Commitizen](https://commitizen-tools.github.io/commitizen/)** — Standardized commit messages and automated changelog/versioning
-- **Environment Management** — Stage-based configuration system supporting development and production environments
-- **[MkDocs Documentation](https://www.mkdocs.org/)** — Documentation with Material theme and automated generation
-- **[Makefile Automation](https://www.gnu.org/software/make/)** — Simplified command interface for common development tasks
-
-
-
-## 📋 Requirements
-
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv) package manager
-- Docker (optional, for containerized development)
-- Git
-
-
-## ⚠️ Important
-
-> **Note**: This is a boilerplate template.
-> After cloning or generating your project, remember to:
-> - Update your project name in `pyproject.toml` and `docker-compose.yml`
-> - Replace this README with documentation specific to your project
-> - Configure environment variables in `.env.development` and `.env.production`
-> - Customize the Makefile commands as needed for your project
-
-
-## ⚡ Quick Start
-
-1. **Clone the repository:**
-    ```bash
-    git clone https://github.com/python-boilerplate/uv-template
-    cd uv-template
-    ```
-
-2. **Initialize the project:**
-    ```bash
-    make init
-    ```
-    This will:
-    - Install all dependencies using uv
-    - Set up pre-commit hooks
-
-3. **Set up environment variables:**
-   ```bash
-   cp .env.example .env.development
-   # Edit .env.development as needed
-   ```
-
-4. **Run the application:**
-   ```bash
-   make run
-   ```
-
-
-## 🧑‍💻 Usage Options:
-
-### Clone Repository:
-
-1. **Use this Template:**
-   Click “Use this template” on GitHub to create your own repository based on this boilerplate.
-
-2. **Clone Directly:**
-   Use the standard `git clone` command to clone this repository locally to your machine.
+> **Current Branch: `feat/01-initial-repo-structure`**
+> This branch sets up the core repository architecture, strict static typing, modern packaging, and automated quality gates before any algorithmic or mathematical autograd code is introduced.
 
 ---
 
-### Development Options:
+## 1. Lecture Overview & Branch Progression
 
-1. **Local Development:**
-   Use `uv` and Makefile for local development without containers.
+`utorch` is an educational implementation of automatic differentiation and deep learning primitives designed for teaching PyTorch internals from first principles.
 
-2. **Dockerized Development:**
-   Utilize Docker and Docker Compose for isolated, containerized workflows.
-   See [Docker instructions](https://python-boilerplate.github.io/uv-template/features/docker/) in the documentation.
+To make the learning journey manageable, the project is structured across a sequence of focused Git branches:
 
-3. **GitHub Codespaces:**
-   Launch in [GitHub Codespaces](https://github.com/features/codespaces) for instant cloud-based development with pre-configured devcontainer support.
+| Branch | Topic | Description |
+|---|---|---|
+| **`feat/01-initial-repo-structure`** *(Current)* | **Tooling & Architecture** | Modern Python setup (`uv`), strict linting, type checks, pre-commit, and CI/CD. |
+| `feat/02-forward-graphs` | **Computational Graphs** | DAG node abstractions, forward evaluation, and graph visualization. |
+| `feat/03-scalar-autograd` | **Scalar Autograd** | Reverse-mode automatic differentiation on scalar values (micrograd style). |
+| `feat/04-tensor-autograd` | **Tensor Autograd & VJP** | Multidimensional arrays, broadcasting, and Vector-Jacobian Products. |
+| `feat/05-nn-framework` | **Neural Network Abstractions** | High-level API (`Module`, `Parameter`, `Loss`, `Optimizer`, and `Dataset`). |
+| `feat/06-hardware-acceleration` | **GPU Acceleration** | Custom compute kernels with Triton / PyCUDA. |
+| `main` | **Full Reference Build** | Fully integrated library with completed lectures, benchmarks, and examples. |
 
-## 📚 Documentation
+---
 
-**For detailed guides and advanced scenarios, see the [full documentation](https://python-boilerplate.github.io).**
+## 2. Repository Layout
 
+The project uses a flat package layout designed for maximum transparency and pedagogical clarity:
 
-## 📄 License
-[MIT License](./LICENSE) &mdash;
-Yurii | monok8i 🦋
+```text
+utorch/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml               # Automated linting, type checking, and unit testing
+│       └── docs.yml             # Automatic MkDocs deployment to GitHub Pages
+├── .pre-commit-config.yaml      # Git hook specifications for local checks
+├── .python-version              # Target Python runtime (3.13)
+├── CONTRIBUTING.md              # Contributor workflow and lecture standards
+├── LICENSE                      # MIT License
+├── README.md                    # Branch-specific documentation
+├── pyproject.toml               # Single source of truth for build & tooling configs
+├── utorch/                      # Core framework package
+│   ├── __init__.py              # Top-level exports and versioning
+│   ├── autograd/                # Computational graphs and reverse-mode autodiff
+│   │   └── __init__.py
+│   ├── nn/                      # Neural network layers, losses, and optimizers
+│   │   └── __init__.py
+│   └── utils/                   # Datasets, batching, and graphviz visualization
+│       └── __init__.py
+├── tests/                       # Pytest test suite
+│   └── test_dummy_func.py       # Dummy tests
+└── docs/                        # Documentation site
+    ├── index.md                 # Homepage
+    ├── roadmap.md               # Syllabus and branch navigation
+    └── api/                     # Autogenerated API documentation via mkdocstrings
+```
+
+---
+
+## 3. Developer Tooling & Engineering Stack
+
+This branch introduces an enterprise-grade, modern Python development stack:
+
+### A. Package & Dependency Management: [`uv`](https://docs.astral.sh/uv/)
+The project is managed via Astral's `uv`, which allows:
+* **Instant Virtualenv Creation**: Creates and manages the Python 3.13 environment in milliseconds.
+* **Hermetic Tool Execution**: Run any tool in the project environment using `uv run <command>` without needing manual environment activation.
+* **Deterministic Builds**: Declared in standard PEP 517/621 `pyproject.toml` with `hatchling`.
+
+### B. Fast Linting & Formatting: [`ruff`](https://docs.astral.sh/ruff/)
+* Replaces Flake8, Black, and isort with a single Rust-powered binary.
+* Configured with Google-style docstring conventions, standard PEP 8 rules, and automatic import sorting.
+* Line length is set to **88 characters** to preserve readability of complex tensor equations and mathematical derivations.
+
+### C. Static Type Checking: [`mypy`](https://mypy-lang.org/)
+* Configured in **strict mode** (`strict = true`) to enforce typing discipline.
+* Educational benefit: Students see explicit tensor shapes, node dependencies, and function contracts directly in function signatures.
+
+### D. Automated Quality Gate: [`pre-commit`](https://pre-commit.com/)
+* Automatically verifies every commit before it hits Git history:
+  1. File hygiene (stripping trailing whitespace, checking TOML/YAML syntax).
+  2. Code formatting (`ruff format`).
+  3. Linter checks (`ruff check --fix`).
+  4. Type consistency (`mypy`).
+  5. Test suite execution (`pytest`).
+  6. Conventional commit message format validation (`commitizen`).
+
+### E. Continuous Integration: GitHub Actions
+* **CI Workflow (`.github/workflows/ci.yml`)**: Runs on every push and pull request across all branches. Executes formatting checks, linting, mypy.
+*  ** Tests (`.github/workflows/tests.yml`)**:  Runs all the Unit Tests and calcualtes test coverage. Runs on every push and pull request across all branches.
+* **Documentation Deployment (`.github/workflows/docs.yml`)**: Automatically extracts docstrings from `utorch` and publishes a PyTorch-styled documentation website to GitHub Pages on merges to `main`.
+
+### F. Documentation Engine: [`mkdocs-material`](https://squidfunk.github.io/mkdocs-material/) & [`mkdocstrings`](https://mkdocstrings.github.io/)
+* Configured with a PyTorch-inspired burnt orange theme.
+* Supports **LaTeX math formulas** ($\nabla_x L$, $\frac{\partial y}{\partial x}$) via MathJax/KaTeX.
+* Automatically inspects docstrings to generate live API references.
+
+---
+
+## 4. Getting Started
+
+### Prerequisites
+* **Python**: `3.13` or newer
+* **uv**: Install via official script:
+  ```bash
+  # macOS / Linux
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+
+  # Windows
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+  ```
+
+### Local Setup in 3 Commands
+
+1. **Clone the repository and switch to Branch 1**:
+   ```bash
+   git clone https://github.com/adendek/utorch.git
+   cd utorch
+   git checkout feat/01-initial-repo-structure
+   ```
+
+2. **Sync the virtual environment and dependencies**:
+   ```bash
+   uv sync
+   ```
+
+3. **Install Git pre-commit hooks**:
+   ```bash
+   uv run pre-commit install --install-hooks
+   ```
+
+---
+
+## 5. Development Command Reference
+
+All commands run through `uv run` to guarantee they execute within the isolated project environment:
+
+| Task | Command | Description |
+|---|---|---|
+| **Run All Hooks** | `uv run pre-commit run --all-files` | Manually triggers all pre-commit checks |
+| **Serve Docs** | `uv run mkdocs serve` | Starts local documentation server at `http://127.0.0.1:8000` |
+| **Run Tests** | `uv run pytest` | Executes all unit tests with verbose output |
+| **Test Coverage** | `uv run pytest --cov=utorch` | Runs tests and prints coverage table |
+| **Lint Code** | `uv run ruff check .` | Runs Ruff linter checks |
+| **Auto-fix Lint** | `uv run ruff check . --fix` | Automatically fixes safe linting errors |
+| **Format Code** | `uv run ruff format .` | Formats all code according to project style |
+| **Type Check** | `uv run mypy utorch/` | Runs strict static type validation |

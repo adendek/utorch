@@ -1,38 +1,52 @@
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.12.0
-  hooks:
-    # Run the linter.
-    - id: ruff-check
-      args: [ --config=pyproject.toml ]
-      files: ^src/
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: [ '--maxkb=5000' ]
 
-    # Run the formatter.
-    - id: ruff-format
-      args: [ --config=pyproject.toml ]
-      files: ^src/
 
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.16.1
-  hooks:
-    # Run mypy type checking.
-    - id: mypy
-      args: [--config-file=pyproject.toml ]
-      files: ^src/
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.0
+    hooks:
+      - id: ruff
+        name: ruff check
+        args: [--config=pyproject.toml, --fix]
+        files: ^(utorch|tests)/
 
-- repo: local
-  hooks:
-    # Run pytest.
-    - id: pytest
-      name: pytest
-      entry: uv run pytest
-      language: system
-      types: [python]
-      pass_filenames: false
-      args: [ -v ]
+      - id: ruff-format
+        name: ruff format
+        args: [--config=pyproject.toml]
+        files: ^(utorch|tests)/
 
-- repo: https://github.com/commitizen-tools/commitizen
-  rev: v4.8.3
-  hooks:
-    - id: commitizen
-      stages: [commit-msg]
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy utorch/
+        language: system
+        types: [python]
+        files: ^utorch/
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.8.3
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
