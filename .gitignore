@@ -178,3 +178,5 @@ cython_debug/
 
 # Dockerignore file for each app stage
 .dockerignore
+/.idea
+.DS_Store
