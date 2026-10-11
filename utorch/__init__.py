@@ -3,12 +3,12 @@
 __version__ = "0.1.0"
 
 from utorch import autograd, nn, utils
-from utorch.dummy_functions import dummy_function
+from utorch.autograd import Tensor
 
 __all__ = [
+    "Tensor",
     "__version__",
     "autograd",
-    "dummy_function",
     "nn",
     "utils",
 ]
