@@ -17,12 +17,12 @@
 
 ---
 
-> **Current Branch: `feat/02-forward-graphs`**
-> This branch implements the core dynamic computational graph foundation: `Tensor` abstractions, operator overloading, tree-inspired Graphviz visualization, and graph complexity metrics prior to reverse-mode automatic differentiation.
+> **Current Branch: `feat/03-scalar-autograd`**
+> This branch implements scalar reverse-mode automatic differentiation (backpropagation). Because accumulated gradients are first-class `Tensor` instances, the engine dynamically builds a secondary computation tape, unlocking higher-order derivatives ($\frac{d^2 y}{dx^2}$) for free.
 
 ---
 
-## 1. Lecture Overview & Branch Progression
+## Lecture Overview & Branch Progression
 
 `utorch` is an educational implementation of automatic differentiation and deep learning primitives designed for teaching PyTorch internals from first principles.
 
@@ -31,8 +31,8 @@ To make the learning journey manageable, the project is structured across a sequ
 | Branch | Topic | Description |
 |---|---|---|
 | **`feat/01-initial-repo-structure`**  | **Tooling & Architecture** | Modern Python setup (`uv`), strict linting, type checks, pre-commit, and CI/CD. |
-| `feat/02-forward-graphs` | **Computational Graphs** *(Current)* | DAG node abstractions, forward evaluation, and graph visualization. |
-| `feat/03-scalar-autograd` | **Scalar Autograd** | Reverse-mode automatic differentiation on scalar values (micrograd style). |
+| `feat/02-forward-graphs` | **Computational Graphs**  | DAG node abstractions, forward evaluation, and graph visualization. |
+| `feat/03-scalar-autograd` | **Scalar Autograd**  *(Current)* | Reverse-mode automatic differentiation on scalar values (micrograd style). |
 | `feat/04-tensor-autograd` | **Tensor Autograd & VJP** | Multidimensional arrays, broadcasting, and Vector-Jacobian Products. |
 | `feat/05-nn-framework` | **Neural Network Abstractions** | High-level API (`Module`, `Parameter`, `Loss`, `Optimizer`, and `Dataset`). |
 | `feat/06-hardware-acceleration` | **GPU Acceleration** | Custom compute kernels with Triton / PyCUDA. |
@@ -41,80 +41,93 @@ To make the learning journey manageable, the project is structured across a sequ
 ---
 
 
-## 2. Dynamic Computational Graphs (Define-by-Run)
+## Reverse-Mode Automatic Differentiation
 
-In modern deep learning engines, computational graphs are not statically compiled ahead of time. Instead, they are built **dynamically at runtime** as Python executes arithmetic expressions.
+Unlike numerical differentiation (slow, imprecise) or symbolic differentiation (expression explosion), **reverse-mode automatic differentiation** calculates exact analytical gradients by traversing the computational Directed Acyclic Graph (DAG) in **reverse topological order**.
 
-Every node in `utorch` belongs to one of two fundamental categories:
+### The Multivariate Chain Rule
+For any variable $x$ affecting the scalar output $L$ through multiple downstream children:
 
-1. **Leaf Nodes (Inputs, Parameters, Constants)**:
-   * Created directly by the user with an explicit numerical `value`.
-   * Have **no antecedent parents** (`parents = []`) and **no creator function** (`fun = None`).
-   * `is_leaf` evaluates to `True`.
-
-2. **Inner Nodes (Intermediate Operations)**:
-   * Created automatically when operations (`+`, `-`, `*`, `/`, `@`, `relu`, `sin`) are executed.
-   * Hold references to their **antecedent parent nodes** (`parents`) and the **generating operation** (`op = "add"`, etc.).
-   * Their value is evaluated dynamically during the forward pass: $\text{value} = \text{fun}(*\text{parent\_values})$.
-   * `is_leaf` evaluates to `False`.
+$$\frac{\partial L}{\partial x} = \sum_{y \in \text{children}(x)} \frac{\partial L}{\partial y} \cdot \frac{\partial y}{\partial x}$$
 
 ---
 
-## 4. Graph Visualization: The Tree Metaphor
+## The 5 Execution Phases of `backward()`
 
-`utorch.utils.viz` provides `draw_graph(root)` using Graphviz to render computational graphs with a nature-inspired tree palette:
+When you call `loss.backward()`, `utorch` executes five distinct algorithmic steps:
 
-* **Leaf Nodes (Inputs & Constants)**: Styled in **Leaf Green** (`#C8E6C9` with `#2E7D32` borders) displaying the variable name and numerical value.
-* **Interim Nodes (Trunk & Operations)**: Styled in **Woody Brown** (`#D7CCC8` with `#5D4037` borders) displaying the operation label (`op: add`, `op: mul`, `op: matmul`) and evaluated output.
+1. **Scalar Verification & Seed**:
+   * Ensures the root is a scalar (0-D or 1-element tensor).
+   * Seeds the gradient with the identity derivative: $\frac{\partial L}{\partial L} = 1.0$.
+2. **Reverse Topological Sort**:
+   * Uses Depth-First Search (DFS) with a visited set to order nodes so every child appears strictly before its parents.
+3. **Primitive Derivative Dispatch**:
+   * Inspects `node.fun` to retrieve the corresponding analytical derivative rule from `SCALAR_PRIMITIVES`.
+4. **Local Chain Rule Evaluation**:
+   * Evaluates the local derivative using incoming `node.grad` and parent `Tensor` inputs.
+5. **Gradient Accumulation (`+=`)**:
+   * Accumulates local gradient contributions into `parent.grad`.
+   * **Crucial Rule**: Gradients **must accumulate via `+=`**, never overwrite (`=`), to account for multi-path dependencies (diamond graphs).
+
+---
+
+## Higher-Order Autograd: Gradients as Tensors
+
+In `utorch`, derivative primitive rules return **`Tensor` instances** rather than floats. This means:
+* Every gradient computation is recorded on a **secondary computational tape**.
+* Calling `first_grad.backward()` calculates **second derivatives ($\frac{d^2 y}{dx^2}$)** without any manual Hessian derivations!
 
 ```python
-from utorch import Tensor
-from utorch.utils.viz import draw_graph
+import utorch as ut
 
-x = Tensor(2.0, name="x")
-w = Tensor(3.0, name="w")
-b = Tensor(1.5, name="b")
+# Let y = x^3.
+# First derivative:  dy/dx   = 3x^2 -> at x=2: 12.0
+# Second derivative: d2y/dx2 = 6x   -> at x=2: 12.0
+x = ut.Tensor(2.0, name="x")
+y = x**3
 
-# Forward expression
-loss = ((x * w) + b).relu()
-loss.name = "loss"
+# 1. First backward pass
+y.backward()
+print(f"dy/dx: {x.grad.value}")  # 12.0
 
-# Render Directed Acyclic Graph (DAG)
-dot = draw_graph(loss)
+# 2. Second backward pass through the gradient graph
+first_grad = x.grad
+x.zero_grad()
+first_grad.backward()
+print(f"d2y/dx2: {x.grad.value}")  # 12.0
 ```
-
-
-![forward_graph_loss.svg](docs/assets/forward_graph_loss.svg)
 
 ---
 
-## 5. Quantitative Graph Complexity (`count_nodes`)
+## Higher-Order Visualization (`plot_function_and_der`)
 
-To analyze graph scale and memory footprints without manual counting, `count_nodes(root)` traverses the DAG with cycle-safe deduplication:
+`utorch.utils.viz` includes `plot_function_and_der` to visualize $f(x)$ alongside its consecutive derivatives on a single canvas:
 
 ```python
-from utorch.utils.viz import count_nodes
+import numpy as np
+import utorch as ut
+from utorch.utils.viz import plot_function_and_der
 
-stats = count_nodes(loss)
-print(stats)
-# GraphStats(total=6, leaves=3, interim=3, edges=5, ops={'mul': 1, 'add': 1, 'relu': 1})
+# Plots f(x) = sin(x), f'(x) = cos(x), and f''(x) = -sin(x)
+plot_function_and_der(
+    fun=lambda x: x.sin(),
+    x_range=(-np.pi, np.pi),
+    n_derivatives=2,
+    title="Harmonic Cycle: $\\sin(x) \\to \\cos(x) \\to -\\sin(x)$",
+)
 ```
 
-* **`stats.leaves`**: Count of distinct input nodes and constants (reused inputs are counted once).
-* **`stats.interim`**: Total operations performed in the graph.
-* **`stats.edges`**: Total directed dependency links.
-* **`stats.ops`**: Frequency dictionary of every mathematical operation.
+![img.png](docs/assets/fun_and_derivatives.png)
 
 ---
 
-## 6. Lecture Experiments & Highlights
+## Lecture Experiments & Highlights
 
-This branch includes an interactive lecture notebook ([notebooks/02_forward_graphs.ipynb](notebooks/example_forward_graph.ipynb)) covering five core pedagogical experiments:
-
+This branch includes an interactive lecture notebook ([notebooks/03_scalar_autograd.ipynb](notebooks/example_backward_scalar.ipynb)).
 
 ---
 
-## 7. Getting Started
+##  Getting Started
 
 ### Prerequisites
 * **Python**: `3.13` or newer
@@ -148,7 +161,7 @@ This branch includes an interactive lecture notebook ([notebooks/02_forward_grap
 
 ---
 
-## 5. Development Command Reference
+##  Development Command Reference
 
 All commands run through `uv run` to guarantee they execute within the isolated project environment:
 
