@@ -7,6 +7,27 @@ from typing import Any
 
 import numpy as np
 
+from utorch.autograd.ops import SCALAR_PRIMITIVES
+from utorch.autograd.topological_sort import topological_sort
+
+
+def _get_function_name(fun: Callable[..., Any]) -> str:
+    """Extract a clean identifier string from a function or callable object.
+
+    Parses the function's string representation or `__name__` attribute to
+    retrieve the operation key used for looking up analytical derivative
+    rules in the primitive dispatch dictionary.
+
+    Args:
+        fun: Callable mathematical function or ufunc (e.g., `np.sin`, `Tensor.__add__`).
+
+    Returns:
+        The extracted operation name string (e.g., "sin", "add", "cos").
+    """
+    if hasattr(fun, "__name__") and fun.__name__ != "<lambda>":
+        return str(fun.__name__)
+    return str(fun).split(".")[1]
+
 
 class Tensor:
     """A multidimensional array and computational graph node.
@@ -101,6 +122,8 @@ class Tensor:
             self._init_if_leaf(value)
         else:
             self._init_as_inner_node(parents or [], fun, args)
+
+        self.grad = None
 
     def _init_if_leaf(self, value: Any) -> None:
         """Initialize this variable as a user-supplied leaf node (no parents)."""
@@ -349,20 +372,142 @@ class Tensor:
     # Representation & Placeholder
     # =========================================================================
 
-    def backward(self) -> None:
-        """Placeholder for reverse-mode automatic differentiation.
-
-        Introduced in Branch 3 (scalar) and Branch 4 (tensor vector-Jacobian products).
-        """
-        raise NotImplementedError(
-            "Backward pass is not yet available in Branch 2 (Forward graphs only). "
-            "Switch to Branch 3 (feat/03-scalar-autograd) for autograd."
-        )
-
     def __repr__(self) -> str:
         """Return a string representation of the tensor for inspection."""
         name_str = f"'{self.name}', " if self.name else ""
         if self.is_leaf:
             return f"ut.Tensor({name_str}value={self.value})"
-        fun_name = getattr(self.fun, "__name__", "op")
-        return f"ut,.Tensor({name_str}value={self.value}, fun={fun_name})"
+        return (
+            f"ut,.Tensor({name_str}value={self.value}, "
+            f"fun={_get_function_name(self.fun)})"  # type: ignore[arg-type]
+        )
+
+    def zero_grad(self) -> None:
+        """Reset gradient to zero on this node."""
+        self.grad = None
+
+    def backward(self, grad_tensor: Tensor | None = None) -> None:
+        """Execute reverse-mode automatic differentiation (backpropagation).
+
+        Computes the gradient of this output tensor with respect to all upstream
+        nodes in the computational graph using the multivariate chain rule.
+
+        Because gradients are accumulated as `Tensor` instances rather than raw
+        floats, the backward pass dynamically constructs a secondary computation
+        graph, enabling arbitrary higher-order derivatives (e.g., double backward
+        for Hessians).
+
+        The backward algorithm executes in five distinct pedagogical phases:
+
+        1. **Scalar Verification & Seed Initialization**:
+           - Reverse-mode autograd starts at a scalar objective (e.g., loss).
+           - The root gradient is seeded with the identity: dL/dL = 1.0.
+           - If an explicit `grad_tensor` is supplied, it is used as the seed.
+
+        2. **Reverse Topological Ordering**:
+           - Performs a Depth-First Search (DFS) from `self` backwards to all
+             reachable ancestor nodes.
+           - Arranges nodes so every child appears strictly before its parents.
+           - Guarantees that when a node is processed, it has already collected
+             all incoming gradient contributions from all downstream paths.
+
+        3. **Primitive Derivative Dispatch**:
+           - Traverses nodes in reverse topological order.
+           - For each intermediate operation node, looks up its analytical
+             derivative rule in `SCALAR_PRIMITIVES` using `node.op`.
+
+        4. **Local Chain Rule Evaluation**:
+           - For binary operations z = f(x, y):
+             dx = d_rule_left(grad_z, x, y)
+             dy = d_rule_right(grad_z, x, y)
+           - For unary operations y = f(x):
+             dx = d_rule(grad_y, x)
+
+        5. **Gradient Accumulation (Multivariate Chain Rule)**:
+           - Local gradient contributions are added to antecedent parents using
+             `+=` (`parent.grad = parent.grad + d_parent`).
+           - Accumulation (rather than overwriting) is mathematically mandatory
+             when a variable is reused across multiple paths (diamond graphs).
+
+        Args:
+            grad_tensor: Seed gradient for this node. If None, defaults to
+                Tensor(1.0).
+
+        Raises:
+            RuntimeError: If called on a non-scalar tensor without an explicit
+                `grad_tensor`.
+            ValueError: If an operation node has no matching primitive rule in
+                `SCALAR_PRIMITIVES`.
+
+        Examples:
+            ```python
+            import utorch as ut
+
+            # 1. First-order derivative of a polynomial: y = x^2 + 3x
+            x = ut.Tensor(4.0, name="x")
+            y = (x ** 2) + 3.0 * x  # dy/dx = 2x + 3 = 11.0
+            y.backward()
+            print(x.grad.value)     # 11.0
+
+            # 2. Second-order derivative (double backward): d2y/dx2 = 2.0
+            first_grad = x.grad
+            x.zero_grad()
+            first_grad.backward()
+            print(x.grad.value)     # 2.0
+            ```
+        """
+        # 1. Seed root gradient as a Tensor node
+        if grad_tensor is None:
+            self.grad = Tensor(1.0)  # type: ignore[assignment]
+        else:
+            self.grad = grad_tensor  # type: ignore[assignment]
+
+        # 2. Get reverse topological evaluation order (root first, down to leaves)
+        ordered_nodes = topological_sort(self)
+
+        # 3. Propagate gradients backwards
+        for node in ordered_nodes:
+            # Leaf nodes have no parents to propagate into
+            if not node.parents:
+                continue
+
+            op_key = getattr(node, "op", None) or _get_function_name(node.fun)
+            if op_key not in SCALAR_PRIMITIVES:
+                raise ValueError(f"No derivative registered for op: '{op_key}'")
+
+            rule = SCALAR_PRIMITIVES[op_key]
+
+            # Binary operations (2 parents)
+            if len(node.parents) == 2:
+                parent_left, parent_right = node.parents
+
+                # Support both a list [d_left, d_right]
+                # or a function returning (d_left, d_right)
+                if isinstance(rule, list):
+                    d_left = rule[0](node.grad, parent_left, parent_right, node.args)
+                    d_right = rule[1](node.grad, parent_left, parent_right, node.args)
+                else:
+                    d_left, d_right = rule(
+                        node.grad, parent_left, parent_right, node.args
+                    )
+
+                # Accumulate gradients
+                # (+= records computation graph if grad is a Tensor)
+                parent_left.grad = (
+                    d_left if parent_left.grad is None else parent_left.grad + d_left
+                )
+                parent_right.grad = (
+                    d_right
+                    if parent_right.grad is None
+                    else parent_right.grad + d_right
+                )
+
+            # Unary operations (1 parent)
+            elif len(node.parents) == 1:
+                parent = node.parents[0]
+                rule_fn = rule[0] if isinstance(rule, list) else rule
+                d_parent = rule_fn(node.grad, parent, node.args)
+
+                parent.grad = (
+                    d_parent if parent.grad is None else parent.grad + d_parent
+                )
