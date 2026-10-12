@@ -12,13 +12,22 @@
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+
+<p align="center">
+  <b><a href="https://adendek.github.io/utorch/">Read the Full Documentation & API Reference</a></b>
+</p>
+
+
 </div>
 
 
 ---
 
-> **Current Branch: `feat/04-tensor-autograd`**
-> This branch scales the autograd engine from 0-D scalars to multi-dimensional tensors. It introduces Vector-Jacobian Products (VJPs), automated reverse broadcasting (`unbroadcast`), dimensional reductions (`sum`, `mean`), matrix multiplication (`@`).
+> **Current Branch: `feat/05-nn-framework`**
+> This branch introduces the high-level, object-oriented neural network framework:
+> `Parameter`, `Module`, `Linear`, `Sequential`, loss functions (`MSELoss`,
+> `CrossEntropyLoss`), optimizers (`SGD`), and `DataLoader` data pipelines.
+
 
 ---
 
@@ -30,99 +39,115 @@ To make the learning journey manageable, the project is structured across a sequ
 
 | Branch | Topic | Description |
 |---|---|---|
-| **`feat/01-initial-repo-structure`**  | **Tooling & Architecture** | Modern Python setup (`uv`), strict linting, type checks, pre-commit, and CI/CD. |
-| `feat/02-forward-graphs` | **Computational Graphs**  | DAG node abstractions, forward evaluation, and graph visualization. |
-| `feat/03-scalar-autograd` | **Scalar Autograd**  | Reverse-mode automatic differentiation on scalar values (micrograd style). |
-| `feat/04-tensor-autograd` | **Tensor Autograd & VJP**   *(Current)* | Multidimensional arrays, broadcasting, and Vector-Jacobian Products. |
-| `feat/05-nn-framework` | **Neural Network Abstractions** | High-level API (`Module`, `Parameter`, `Loss`, `Optimizer`, and `Dataset`). |
+| **[feat/01-initial-repo-structure](https://github.com/adendek/utorch/tree/feat/01-initial-repo-structure)**  | **Tooling & Architecture** | Modern Python setup (`uv`), strict linting, type checks, pre-commit, and CI/CD. |
+| [feat/02-forward-graphs](https://github.com/adendek/utorch/tree/feat/02-forward-graphs) | **Computational Graphs**  | DAG node abstractions, forward evaluation, and graph visualization. |
+| [feat/03-scalar-autograd](https://github.com/adendek/utorch/tree/feat/03-scalar-autograd) | **Scalar Autograd**  | Reverse-mode automatic differentiation on scalar values (micrograd style). |
+| [feat/04-tensor-autograd](https://github.com/adendek/utorch/tree/feat/04-tensor-autograd)| **Tensor Autograd & VJP**    | Multidimensional arrays, broadcasting, and Vector-Jacobian Products. |
+| [feat/05-nn-framework](https://github.com/adendek/utorch/tree/feat/05-nn-framework) | **Neural Network Abstractions** *(Current)* | High-level API (`Module`, `Parameter`, `Loss`, `Optimizer`, and `Dataset`). |
 | `feat/06-hardware-acceleration` | **GPU Acceleration** | Custom compute kernels with Triton / PyCUDA. |
 | `main` | **Full Reference Build** | Fully integrated library with completed lectures, benchmarks, and examples. |
 
 ---
 
 
-## Vector-Jacobian Products (VJP)
+##  High-Level Modular Abstractions
 
-Computing the explicit Jacobian matrix $J = \frac{\partial Y}{\partial A}$ for a matrix operation like $Y = A @ B$ is computationally prohibitive ($\mathcal{O}(M \cdot N)$ memory).
+In **Branches 1–4**, models were trained by manually managing raw weight arrays,
+writing manual forward loops, and implementing custom parameter updates.
 
-Reverse-mode autograd evaluates the **Vector-Jacobian Product directly**, multiplying the incoming loss gradient $G = \frac{\partial L}{\partial Y}$ with $J$ without ever instantiating $J$ in memory:
+`utorch.nn` introduces the object-oriented abstractions that make PyTorch
+the standard in deep learning research:
 
-$$\frac{\partial L}{\partial A} = G @ B^T \quad \text{and} \quad \frac{\partial L}{\partial B} = A^T @ G$$
+### A. `nn.Parameter`
+A subclass of `Tensor` that flags numerical data as a **trainable model parameter**.
+When assigned as an attribute on an `nn.Module`, it is automatically detected and
+registered for optimizer updates.
 
-```text
-Forward Pass:
-  A: (M, K)
-  B: (K, N)
-  Y = A @ B: (M, N)
+### B. `nn.Module`
+The base class for all neural network architectures:
+* **`forward(*args, **kwargs)`**: The forward computation definition to override.
+* **`__call__(*args, **kwargs)`**: Dispatches to `self.forward()`, mimicking
+  PyTorch execution syntax.
+* **`parameters()`**: Recursively discovers all `Parameter` instances registered
+  directly, within lists/tuples, or inside nested child `Module` submodules.
+* **`zero_grad()`**: Resets gradients across all registered parameters.
+* **`num_parameters()`**: Computes total trainable scalar parameter count.
 
-Backward Pass (Incoming Gradient G = dL/dY of shape (M, N)):
-  dL/dA = G (M, N) @ B^T (N, K) -> (M, K)  [Inner dimension N cancels]
-  dL/dB = A^T (K, M) @ G (M, N) -> (K, N)  [Inner dimension M cancels]
-```
+### C. Layers & Containers
+* **`nn.Linear(in_features, out_features, bias=True)`**: Fully connected layer
+  ($Y = X W^T + b$) with Kaiming uniform weight initialization.
+* **`nn.ReLU()`, `nn.Sigmoid()`**: Non-linear activation modules.
+* **`nn.Sequential(*layers)`**: Container cascading layer outputs into the next
+  module's inputs.
 
----
+### D. Loss Functions
+* **`nn.MSELoss()`**: Mean Squared Error regression loss.
+* **`nn.CrossEntropyLoss()`**: Multi-class classification loss with logits using
+  the numerically stable LogSumExp formulation.
 
-## Automated Reverse Broadcasting (`unbroadcast`)
+### E. Optimizers
+* **`nn.SGD(params, lr, momentum=0.0)`**: Stochastic Gradient Descent with
+  optional classical momentum.
 
-In modern deep learning architectures, small parameter tensors (such as a 1D bias vector) are implicitly stretched across batch dimensions during the forward pass:
-
-$$\text{Output} = X W + \mathbf{b} \quad \left(X W \in \mathbb{R}^{B \times D}, \; \mathbf{b} \in \mathbb{R}^{D}\right)$$
-
-In the backward pass, incoming gradients match the expanded shape $(B, D)$. The multivariable chain rule requires that **any dimension expanded during the forward pass must be summed together during the backward pass**:
-
-$$\frac{\partial L}{\partial \mathbf{b}} = \sum_{i=1}^{B} G_{i, :}$$
-
-In `utorch`, this is automated centrally in the `backward()` engine via `unbroadcast(grad, target_shape)`:
-1. Extra leading dimensions (e.g. batch size) are summed out.
-2. Singleton dimensions (size 1) that were expanded are summed with `keepdims=True`.
-3. Primitives remain pure mathematical rules without manual broadcasting boilerplate.
-
----
-
-## Reduction Calculus (`sum` & `mean`)
-
-When reduction operations collapse dimensions in the forward pass, incoming gradients must be **broadcasted back** across the collapsed axes:
-
-* **Summation Backward**:
-  $$\frac{\partial}{\partial X_i} \sum_{j} X_j = 1.0 \implies \frac{\partial L}{\partial X} = \text{broadcast\_to}(G, X.\text{shape})$$
-* **Mean Backward**:
-  $$\frac{\partial}{\partial X_i} \left(\frac{1}{N} \sum_{j=1}^{N} X_j\right) = \frac{1}{N} \implies \frac{\partial L}{\partial X} = \frac{1}{N} \cdot \text{sum\_backward}(G, X, \text{axis})$$
+### F. Data Pipelines (`utorch.utils.data`)
+* **`TensorDataset(*tensors)`**: Packages feature and target arrays.
+* **`DataLoader(dataset, batch_size, shuffle=True)`**: Streams shuffled mini-batches
+  to avoid memory bottlenecks.
 
 ---
 
+## 4. The Canonical Deep Learning Loop
 
-## Lecture Experiments & Highlights
+With `utorch.nn`, training neural networks uses the exact same syntax as real PyTorch:
 
-This branch includes an interactive lecture notebook (`examples/04_tensor_autograd.ipynb`) focused on two core pedagogical exercises:
-
-### 1. Dense Layer Projection with Bias Broadcasting ($Y = X W + b$)
-Demonstrates the fundamental building block of deep learning:
 ```python
 import utorch as ut
+import utorch.nn as nn
+from utorch.utils.data import DataLoader, TensorDataset
 
-# Inputs: Batch of 4 samples, 3 features (4, 3)
-X = ut.Tensor([[1.0, 2.0, 3.0]] * 4, name="X")
-# Weights: 3 inputs -> 2 outputs (3, 2)
-W = ut.Tensor([[0.5, -0.5], [1.0, 0.0], [-1.0, 1.0]], name="W")
-# Bias: 1D vector (2,) broadcasted across all 4 samples
-b = ut.Tensor([10.0, -10.0], name="b")
+# 1. Compose architecture
+model = nn.Sequential(
+    nn.Linear(784, 128),
+    nn.ReLU(),
+    nn.Linear(128, 10),
+)
 
-# Forward: (4, 3) @ (3, 2) + (2,) -> (4, 2)
-Y = (X @ W) + b
-loss = Y.sum()
-loss.backward()
+criterion = nn.CrossEntropyLoss()
+optimizer = nn.Adam(model.parameters(), lr=0.005)
 
-assert X.grad.shape == (4, 3)  # G @ W^T
-assert W.grad.shape == (3, 2)  # X^T @ G
-assert b.grad.shape == (2,)  # unbroadcast(G, (2,)) -> [4.0, 4.0]
+# 2. Standard training loop
+for batch_x, batch_y in train_loader:
+    optimizer.zero_grad()  # Reset parameter gradients
+    logits = model(batch_x)  # Forward pass through Module DAG
+    loss = criterion(logits, batch_y)  # Evaluate loss
+    loss.backward()  # Reverse-mode autograd (VJP)
+    optimizer.step()  # Update parameters with Adam
 ```
 
-### 2. Manual Calculus vs. `utorch` Autograd (MSLE Benchmark)
-Compares the tedious pen-and-paper derivative derivations from classic lab exercises against automatic differentiation on Mean Squared Logarithmic Error:
-$$\text{MSLE} = \frac{1}{B} \sum_{i=1}^{B} \Big(\ln(1 + y_i) - \ln(1 + \hat{y}_i)\Big)^2$$
+---
 
-* **Manual NumPy**: Requires 15 lines of quotient rule derivations, manual transpositions ($X^T @ d_{\text{preds}}$), and explicit `np.sum(..., axis=0)` reductions.
-* **`utorch`**: Evaluates the loss directly in mathematical notation; calling `loss.backward()` matches the hand-derived analytical formulas down to $10^{-7}$ precision.
+## 5. Lecture Experiments & Highlights
+
+This branch includes an interactive lecture notebook ([examples/05_nn_framework.ipynb](notebooks/example_nn.ipynb))
+covering two core milestones:
+
+### 1. The Non-Linear XOR Problem
+Proves that hidden representations and non-linear activations break linear
+separability barriers:
+* **Architecture**: `Sequential(Linear(2, 8), ReLU, Linear(8, 1))` + `MSELoss`.
+* **Convergence**: Trains with `SGD` to reach loss $< 0.001$ in under 150 iterations.
+
+
+
+### 2. MNIST Handwritten Digit Classification
+Trains a deep classifier on 784-dimensional pixel arrays:
+* **Architecture**: `Sequential(Linear(784, 128), ReLU, Linear(128, 10))` +
+  `CrossEntropyLoss`.
+* **Pipeline**: Shuffled batched loading with `DataLoader`, training vs. validation
+  tracking, convergence curve plotting, and an interactive drawing canvas for
+  live inference.
+
+![img.png](docs/assets/mnist_learning_curve.png)
 
 ---
 
