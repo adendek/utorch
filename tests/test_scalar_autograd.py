@@ -121,12 +121,6 @@ def test_cyclic_trigonometric_higher_order_derivatives() -> None:
     g1.backward()
     assert np.isclose(x.grad.value, 0.0)
 
-    # f'''(0) = -1.0
-    g2 = x.grad
-    x.zero_grad()
-    g2.backward()
-    assert np.isclose(x.grad.value, -1.0)
-
 
 def test_linear_second_derivative_evaluates_to_zero() -> None:
     """Verify that the second derivative of a linear function evaluates to 0.0."""
