@@ -163,6 +163,29 @@ def matmul_backward(
     Returns:
         Tuple of (dL/dA, dL/dB) matching shapes of A and B respectively.
     """
+
+    g_val = grad.value
+    l_val = left.value
+    r_val = right.value
+
+    # Case 1: Dot product of two 1D vectors (output is a 0-D scalar)
+    # y = u @ v -> dy/du = v, dy/dv = u
+    if g_val.ndim == 0 or (l_val.ndim == 1 and r_val.ndim == 1):
+        d_left = grad * right
+        d_right = grad * left
+        return d_left, d_right
+
+    # Case 2: Matrix @ 1D vector: (B, D) @ (D,) -> (B,)
+    if l_val.ndim == 2 and r_val.ndim == 1:
+        # dL/dX = outer product G @ w^T: (B, 1) * (1, D) -> (B, D)
+        g_2d = Tensor(g_val.reshape(-1, 1))
+        r_2d = Tensor(r_val.reshape(1, -1))
+        d_left = g_2d @ r_2d
+        # dL/dw = X^T @ G: (D, B) @ (B,) -> (D,)
+        d_right = left.transpose() @ grad
+        return d_left, d_right
+
+    # Case 3: Standard 2D or batched matrix multiplication
     d_left = grad @ right.transpose()
     d_right = left.transpose() @ grad
     return d_left, d_right
@@ -214,7 +237,7 @@ PRIMITIVES: dict[str, ScalarRule] = {
     "log": lambda grad, x, args: grad / x,
     "tanh": lambda grad, x, args: grad * (1.0 - (x.tanh() ** 2)),
     "sigmoid": lambda grad, x, args: grad * x.sigmoid() * (1.0 - x.sigmoid()),
-    "relu": lambda grad, x, args: grad * (1.0 if x.value > 0.0 else 0.0),
+    "relu": lambda grad, x, args: grad * Tensor(np.where(x.value > 0.0, 1.0, 0.0)),
     # Tensor and  Linear Algebra & Reductions
     "__matmul__": lambda grad, left, right, args: matmul_backward(grad, left, right),
     "sum": lambda grad, x, axis: sum_backward(grad, x, axis),
