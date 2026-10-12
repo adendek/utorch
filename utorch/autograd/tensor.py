@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 
-from utorch.autograd.ops import SCALAR_PRIMITIVES
 from utorch.autograd.topological_sort import topological_sort
 
 
@@ -198,7 +197,7 @@ class Tensor:
             args: Optional static parameters.
 
         Returns:
-            A new Variable representing the operation's output.
+            A new Tensor representing the operation's output.
         """
         return Tensor(parents=[self], fun=fun, args=args)
 
@@ -216,7 +215,7 @@ class Tensor:
             args: Optional static parameters.
 
         Returns:
-            A new Variable representing the operation's output.
+            A new Tensor representing the operation's output.
         """
         other_var = self._ensure_tensor(other)
         return Tensor(parents=[self, other_var], fun=fun, args=args)
@@ -352,14 +351,20 @@ class Tensor:
     # Reductions & Shape Operations
     def sum(self, axis: int | tuple[int, ...] | None = None) -> Tensor:
         """Sum tensor elements across specified axis."""
+        if axis is None:
+            return self.single_operator(lambda x: np.sum(x), args=None)
         return self.single_operator(lambda x, ax: np.sum(x, axis=ax), args=axis)
 
     def mean(self, axis: int | tuple[int, ...] | None = None) -> Tensor:
         """Compute the arithmetic mean of tensor elements across specified axis."""
+        if axis is None:
+            return self.single_operator(lambda x: np.mean(x), args=None)
         return self.single_operator(lambda x, ax: np.mean(x, axis=ax), args=axis)
 
     def transpose(self, axes: Sequence[int] | None = None) -> Tensor:
         """Permute the dimensions of the tensor."""
+        if axes is None:
+            return self.single_operator(lambda x: np.transpose(x), args=None)
         return self.single_operator(lambda x, ax: np.transpose(x, axes=ax), args=axes)
 
     def clip_min(self, min_val: float) -> Tensor:
@@ -456,6 +461,9 @@ class Tensor:
             print(x.grad.value)     # 2.0
             ```
         """
+        from utorch.autograd.ops import PRIMITIVES
+        from utorch.autograd.unbroadcast import unbroadcast
+
         # 1. Seed root gradient as a Tensor node
         if grad_tensor is None:
             self.grad = Tensor(1.0)  # type: ignore[assignment]
@@ -472,10 +480,10 @@ class Tensor:
                 continue
 
             op_key = getattr(node, "op", None) or _get_function_name(node.fun)
-            if op_key not in SCALAR_PRIMITIVES:
+            if op_key not in PRIMITIVES:
                 raise ValueError(f"No derivative registered for op: '{op_key}'")
 
-            rule = SCALAR_PRIMITIVES[op_key]
+            rule = PRIMITIVES[op_key]
 
             # Binary operations (2 parents)
             if len(node.parents) == 2:
@@ -490,6 +498,9 @@ class Tensor:
                     d_left, d_right = rule(
                         node.grad, parent_left, parent_right, node.args
                     )
+                # reverse broadcasting
+                d_left = unbroadcast(d_left, parent_left.shape)
+                d_right = unbroadcast(d_right, parent_right.shape)
 
                 # Accumulate gradients
                 # (+= records computation graph if grad is a Tensor)
@@ -507,7 +518,7 @@ class Tensor:
                 parent = node.parents[0]
                 rule_fn = rule[0] if isinstance(rule, list) else rule
                 d_parent = rule_fn(node.grad, parent, node.args)
-
+                d_parent = unbroadcast(d_parent, parent.shape)
                 parent.grad = (
                     d_parent if parent.grad is None else parent.grad + d_parent
                 )
