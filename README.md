@@ -17,8 +17,8 @@
 
 ---
 
-> **Current Branch: `feat/02-forward-graphs`**
-> This branch implements the core dynamic computational graph foundation: `Tensor` abstractions, operator overloading, tree-inspired Graphviz visualization, and graph complexity metrics prior to reverse-mode automatic differentiation.
+> **Current Branch: `feat/04-tensor-autograd`**
+> This branch scales the autograd engine from 0-D scalars to multi-dimensional tensors. It introduces Vector-Jacobian Products (VJPs), automated reverse broadcasting (`unbroadcast`), dimensional reductions (`sum`, `mean`), matrix multiplication (`@`).
 
 ---
 
@@ -32,8 +32,8 @@ To make the learning journey manageable, the project is structured across a sequ
 |---|---|---|
 | **`feat/01-initial-repo-structure`**  | **Tooling & Architecture** | Modern Python setup (`uv`), strict linting, type checks, pre-commit, and CI/CD. |
 | `feat/02-forward-graphs` | **Computational Graphs**  | DAG node abstractions, forward evaluation, and graph visualization. |
-| `feat/03-scalar-autograd` | **Scalar Autograd**  *(Current)* | Reverse-mode automatic differentiation on scalar values (micrograd style). |
-| `feat/04-tensor-autograd` | **Tensor Autograd & VJP** | Multidimensional arrays, broadcasting, and Vector-Jacobian Products. |
+| `feat/03-scalar-autograd` | **Scalar Autograd**  | Reverse-mode automatic differentiation on scalar values (micrograd style). |
+| `feat/04-tensor-autograd` | **Tensor Autograd & VJP**   *(Current)* | Multidimensional arrays, broadcasting, and Vector-Jacobian Products. |
 | `feat/05-nn-framework` | **Neural Network Abstractions** | High-level API (`Module`, `Parameter`, `Loss`, `Optimizer`, and `Dataset`). |
 | `feat/06-hardware-acceleration` | **GPU Acceleration** | Custom compute kernels with Triton / PyCUDA. |
 | `main` | **Full Reference Build** | Fully integrated library with completed lectures, benchmarks, and examples. |
@@ -41,89 +41,88 @@ To make the learning journey manageable, the project is structured across a sequ
 ---
 
 
-## Reverse-Mode Automatic Differentiation
+## Vector-Jacobian Products (VJP)
 
-Unlike numerical differentiation (slow, imprecise) or symbolic differentiation (expression explosion), **reverse-mode automatic differentiation** calculates exact analytical gradients by traversing the computational Directed Acyclic Graph (DAG) in **reverse topological order**.
+Computing the explicit Jacobian matrix $J = \frac{\partial Y}{\partial A}$ for a matrix operation like $Y = A @ B$ is computationally prohibitive ($\mathcal{O}(M \cdot N)$ memory).
 
-### The Multivariate Chain Rule
-For any variable $x$ affecting the scalar output $L$ through multiple downstream children:
+Reverse-mode autograd evaluates the **Vector-Jacobian Product directly**, multiplying the incoming loss gradient $G = \frac{\partial L}{\partial Y}$ with $J$ without ever instantiating $J$ in memory:
 
-$$\frac{\partial L}{\partial x} = \sum_{y \in \text{children}(x)} \frac{\partial L}{\partial y} \cdot \frac{\partial y}{\partial x}$$
+$$\frac{\partial L}{\partial A} = G @ B^T \quad \text{and} \quad \frac{\partial L}{\partial B} = A^T @ G$$
 
----
+```text
+Forward Pass:
+  A: (M, K)
+  B: (K, N)
+  Y = A @ B: (M, N)
 
-## The 5 Execution Phases of `backward()`
-
-When you call `loss.backward()`, `utorch` executes five distinct algorithmic steps:
-
-1. **Scalar Verification & Seed**:
-   * Ensures the root is a scalar (0-D or 1-element tensor).
-   * Seeds the gradient with the identity derivative: $\frac{\partial L}{\partial L} = 1.0$.
-2. **Reverse Topological Sort**:
-   * Uses Depth-First Search (DFS) with a visited set to order nodes so every child appears strictly before its parents.
-3. **Primitive Derivative Dispatch**:
-   * Inspects `node.fun` to retrieve the corresponding analytical derivative rule from `SCALAR_PRIMITIVES`.
-4. **Local Chain Rule Evaluation**:
-   * Evaluates the local derivative using incoming `node.grad` and parent `Tensor` inputs.
-5. **Gradient Accumulation (`+=`)**:
-   * Accumulates local gradient contributions into `parent.grad`.
-   * **Crucial Rule**: Gradients **must accumulate via `+=`**, never overwrite (`=`), to account for multi-path dependencies (diamond graphs).
-
----
-
-## Higher-Order Autograd: Gradients as Tensors
-
-In `utorch`, derivative primitive rules return **`Tensor` instances** rather than floats. This means:
-* Every gradient computation is recorded on a **secondary computational tape**.
-* Calling `first_grad.backward()` calculates **second derivatives ($\frac{d^2 y}{dx^2}$)** without any manual Hessian derivations!
-
-```python
-import utorch as ut
-
-# Let y = x^3.
-# First derivative:  dy/dx   = 3x^2 -> at x=2: 12.0
-# Second derivative: d2y/dx2 = 6x   -> at x=2: 12.0
-x = ut.Tensor(2.0, name="x")
-y = x**3
-
-# 1. First backward pass
-y.backward()
-print(f"dy/dx: {x.grad.value}")  # 12.0
-
-# 2. Second backward pass through the gradient graph
-first_grad = x.grad
-x.zero_grad()
-first_grad.backward()
-print(f"d2y/dx2: {x.grad.value}")  # 12.0
+Backward Pass (Incoming Gradient G = dL/dY of shape (M, N)):
+  dL/dA = G (M, N) @ B^T (N, K) -> (M, K)  [Inner dimension N cancels]
+  dL/dB = A^T (K, M) @ G (M, N) -> (K, N)  [Inner dimension M cancels]
 ```
 
 ---
 
-## Higher-Order Visualization (`plot_function_and_der`)
+## Automated Reverse Broadcasting (`unbroadcast`)
 
-`utorch.utils.viz` includes `plot_function_and_der` to visualize $f(x)$ alongside its consecutive derivatives on a single canvas:
+In modern deep learning architectures, small parameter tensors (such as a 1D bias vector) are implicitly stretched across batch dimensions during the forward pass:
 
-```python
-import numpy as np
-import utorch as ut
-from utorch.utils.viz import plot_function_and_der
+$$\text{Output} = X W + \mathbf{b} \quad \left(X W \in \mathbb{R}^{B \times D}, \; \mathbf{b} \in \mathbb{R}^{D}\right)$$
 
-# Plots f(x) = sin(x), f'(x) = cos(x), and f''(x) = -sin(x)
-plot_function_and_der(
-    fun=lambda x: x.sin(),
-    x_range=(-np.pi, np.pi),
-    n_derivatives=2,
-    title="Harmonic Cycle: $\\sin(x) \\to \\cos(x) \\to -\\sin(x)$",
-)
-```
+In the backward pass, incoming gradients match the expanded shape $(B, D)$. The multivariable chain rule requires that **any dimension expanded during the forward pass must be summed together during the backward pass**:
 
-![img.png](docs/assets/fun_and_derivatives.png)
+$$\frac{\partial L}{\partial \mathbf{b}} = \sum_{i=1}^{B} G_{i, :}$$
+
+In `utorch`, this is automated centrally in the `backward()` engine via `unbroadcast(grad, target_shape)`:
+1. Extra leading dimensions (e.g. batch size) are summed out.
+2. Singleton dimensions (size 1) that were expanded are summed with `keepdims=True`.
+3. Primitives remain pure mathematical rules without manual broadcasting boilerplate.
 
 ---
+
+## Reduction Calculus (`sum` & `mean`)
+
+When reduction operations collapse dimensions in the forward pass, incoming gradients must be **broadcasted back** across the collapsed axes:
+
+* **Summation Backward**:
+  $$\frac{\partial}{\partial X_i} \sum_{j} X_j = 1.0 \implies \frac{\partial L}{\partial X} = \text{broadcast\_to}(G, X.\text{shape})$$
+* **Mean Backward**:
+  $$\frac{\partial}{\partial X_i} \left(\frac{1}{N} \sum_{j=1}^{N} X_j\right) = \frac{1}{N} \implies \frac{\partial L}{\partial X} = \frac{1}{N} \cdot \text{sum\_backward}(G, X, \text{axis})$$
+
+---
+
 
 ## Lecture Experiments & Highlights
 
-This branch includes an interactive lecture notebook ([notebooks/03_scalar_autograd.ipynb](notebooks/example_backward_scalar.ipynb)).
+This branch includes an interactive lecture notebook (`examples/04_tensor_autograd.ipynb`) focused on two core pedagogical exercises:
+
+### 1. Dense Layer Projection with Bias Broadcasting ($Y = X W + b$)
+Demonstrates the fundamental building block of deep learning:
+```python
+import utorch as ut
+
+# Inputs: Batch of 4 samples, 3 features (4, 3)
+X = ut.Tensor([[1.0, 2.0, 3.0]] * 4, name="X")
+# Weights: 3 inputs -> 2 outputs (3, 2)
+W = ut.Tensor([[0.5, -0.5], [1.0, 0.0], [-1.0, 1.0]], name="W")
+# Bias: 1D vector (2,) broadcasted across all 4 samples
+b = ut.Tensor([10.0, -10.0], name="b")
+
+# Forward: (4, 3) @ (3, 2) + (2,) -> (4, 2)
+Y = (X @ W) + b
+loss = Y.sum()
+loss.backward()
+
+assert X.grad.shape == (4, 3)  # G @ W^T
+assert W.grad.shape == (3, 2)  # X^T @ G
+assert b.grad.shape == (2,)  # unbroadcast(G, (2,)) -> [4.0, 4.0]
+```
+
+### 2. Manual Calculus vs. `utorch` Autograd (MSLE Benchmark)
+Compares the tedious pen-and-paper derivative derivations from classic lab exercises against automatic differentiation on Mean Squared Logarithmic Error:
+$$\text{MSLE} = \frac{1}{B} \sum_{i=1}^{B} \Big(\ln(1 + y_i) - \ln(1 + \hat{y}_i)\Big)^2$$
+
+* **Manual NumPy**: Requires 15 lines of quotient rule derivations, manual transpositions ($X^T @ d_{\text{preds}}$), and explicit `np.sum(..., axis=0)` reductions.
+* **`utorch`**: Evaluates the loss directly in mathematical notation; calling `loss.backward()` matches the hand-derived analytical formulas down to $10^{-7}$ precision.
 
 ---
 
